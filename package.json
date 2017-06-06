@@ -1,0 +1,25 @@
+{
+  "name": "Database-javascript",
+  "version": "1.0.0",
+  "description": "This is the relational SQL database build with node.js",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "example",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matthewxfz/Database-javascript.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/matthewxfz/Database-javascript/issues"
+  },
+  "homepage": "https://github.com/matthewxfz/Database-javascript#readme"
+}
