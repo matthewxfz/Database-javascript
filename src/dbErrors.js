@@ -1,46 +1,79 @@
-class smError extends Error{
-    constructor(message){
-        this.message = message;
-    }
+var codes = {
+  RC_FILE_NOT_FOUND:1,
+  RC_FILE_HANDLE_NOT_INIT:2,
+  RC_WRITE_FAILED:3,
+  RC_READ_NON_EXISTING_PAGE:4,
+  RC_READ_FAILED:5,
+  RC_PAGE_NUMBER_OUT_OF_BOUNDRY:6,
+
+  RC_SET_POINTER_FAILED:100,
+  RC_GET_NUMBER_OF_BYTES_FAILED:101,
+
+  RC_RM_COMPARE_VALUE_OF_DIFFERENT_DATATYPE:200,
+  RC_RM_EXPR_RESULT_IS_NOT_BOOLEAN:201,
+  RC_RM_BOOLEAN_EXPR_ARG_IS_NOT_BOOLEAN:202,
+  RC_RM_NO_MORE_TUPLES:203,
+  RC_RM_NO_PRINT_FOR_DATATYPE:204,
+  RC_RM_UNKOWN_DATATYPE:205,
+
+  RC_IM_KEY_NOT_FOUND:300,
+  RC_IM_KEY_ALREADY_EXISTS:301,
+  RC_IM_N_TO_LAGE:302,
+  RC_IM_NO_MORE_ENTRIES:30,
+};
+
+var type = {
+  RC_FILE_NOT_FOUND:'RC_FILE_NOT_FOUND',
+  RC_FILE_HANDLE_NOT_INIT:'RC_FILE_HANDLE_NOT_INIT',
+  RC_WRITE_FAILED:'RC_WRITE_FAILED',
+  RC_READ_NON_EXISTING_PAGE:'RC_READ_NON_EXISTING_PAGE',
+  RC_READ_FAILED:'RC_READ_FAILED',
+  RC_PAGE_NUMBER_OUT_OF_BOUNDRY:'RC_PAGE_NUMBER_OUT_OF_BOUNDRY',
+
+  RC_SET_POINTER_FAILED:'RC_SET_POINTER_FAILED',
+  RC_GET_NUMBER_OF_BYTES_FAILED:'RC_GET_NUMBER_OF_BYTES_FAILED',
+
+  RC_RM_COMPARE_VALUE_OF_DIFFERENT_DATATYPE:'RC_RM_COMPARE_VALUE_OF_DIFFERENT_DATATYPE',
+  RC_RM_EXPR_RESULT_IS_NOT_BOOLEAN:'RC_RM_EXPR_RESULT_IS_NOT_BOOLEAN',
+  RC_RM_BOOLEAN_EXPR_ARG_IS_NOT_BOOLEAN:'RC_RM_BOOLEAN_EXPR_ARG_IS_NOT_BOOLEAN',
+  RC_RM_NO_MORE_TUPLES:'RC_RM_NO_MORE_TUPLES',
+  RC_RM_NO_PRINT_FOR_DATATYPE:'RC_RM_NO_PRINT_FOR_DATATYPE',
+  RC_RM_UNKOWN_DATATYPE:'RC_RM_UNKOWN_DATATYPE',
+
+  RC_IM_KEY_NOT_FOUND:'RC_IM_KEY_NOT_FOUND',
+  RC_IM_KEY_ALREADY_EXISTS:'RC_IM_KEY_ALREADY_EXISTS',
+  RC_IM_N_TO_LAGE:'RC_IM_N_TO_LAGE',
+  RC_IM_NO_MORE_ENTRIES:'RC_IM_NO_MORE_ENTRIES',
 }
 
+function DBError(message, code, extras) {
+  Error.call(this);
+  Error.captureStackTrace(this, this.constructor);
 
-
-smError.types = {
-    file_not_found:"The file is not found",
-    file_handle_not_init:"Fild handle not init",
-    write_fail:"Write fail",
-    read_fail:"Read fail",
-    read_not_exist_page:"Read not exist page",
-    page_number_out_of_boudary:"Page number is out of boundary",
-    get_number_of_bytes_fail:"Get the number of bytes fail",
-    
-    
-}
-function rmError(message){
-    this.message = message;
-}
-
-rmError.prototype = new Error();
-
-rmError.types = {
-    compare_value_of_different_data_type:"Comparing value of different data type",
-    expected_value_is_not_boolean:"Expected_value_is_not_boolean",
-    boolean_expected_value_is_not_boolean:"Boolean expr vlaue is not boolean",
-    no_more_tuple:"There are no more tuple",
-    no_print_for_datatype:"",
+  this.message = message;
+  if (code) {
+  	this.code = codes[code];
+    this.literalCode = code;
+    if (!this.code) {
+  		throw new Error("Invalid error code: " +  code);
+  	}
+  }
+  if (extras) {
+  	for(var k in extras) {
+  		this[k] = extras[k];
+  	}
+  }
 }
 
-function imError(message){
-    this.message = message;
+DBError.prototype = Object.create(Error.prototype);
+DBError.prototype.constructor = DBError;
+DBError.prototype.name        = 'DBError';
+DBError.prototype.toString    = function () {
+  return '[DBError ' + this.literalCode + ': ' + this.message + ']';
 }
 
-imError.prototype = new Error();
+DBError.codes = codes;
+DBError.type = type;
 
-imError.types = {
-    key_not_found:"",
-    key_already_exsit:"",
-    N_too_large:"",
-    no_more_entries:"",
-}
-module.exports = smError;
+
+module.exports = DBError;
