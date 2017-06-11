@@ -33,7 +33,8 @@ StorageManaer.createPageFile = function (filename, callback) {
             if (callback) callback(err);
         } else {
             //console.log('File [' + filename + '] created!');
-            fs.write(fd, Buffer.alloc(PAGE_SIZE), 0, PAGE_SIZE, 0, function (err) {
+            var buf = Buffer.alloc(PAGE_SIZE,' ',CODING);
+            fs.write(fd, buf, 0, PAGE_SIZE, 0, function (err) {
                 if (callback) callback(err, fd);
             });
         }
@@ -51,15 +52,15 @@ StorageManaer.openPageFile = function (filename, file, callback) {
         if (err) {
             if (err.code == 'ENOENT')
                 err = new DBErrors('File already exist', DBErrors.type.RC_FILE_EXIST);
-            if(callback) callback(err, file);
+            if (callback) callback(err, file);
         } else {
             fs.open(filename, 'r+', (err, fd) => {
                 //console.log('FILE OPENED');
                 file.fileName = filename;
-                file.totalNumPages = Math.ceil(stats.size / PAGE_SIZE);
+                file.totalPageNumber = stats.size / PAGE_SIZE;
                 file.curPagePos = 0;
                 file.fd = fd;
-                if(callback)  callback(err, file);
+                if (callback) callback(err, file);
             });
         }
     });
@@ -122,7 +123,7 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
  */
 StorageManaer.readFirstBlock = function (file, memPage, callback) {
     file.curPagePos = 0;
-    StorageManaer.readBlock(0, file, memPage, callback);
+    StorageManaer.readBlock('0', file, memPage, callback);
 }
 
 /**
@@ -138,7 +139,7 @@ StorageManaer.readPreviousBlock = function (file, memPage, callback) {
         callback(new DBErrors("No previous pages", DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY));
     } else {
         file.curPagePos--;
-        StorageManaer.readBlock(file.curPagePos, memPage, callback);
+        StorageManaer.readBlock(file.curPagePos, file, memPage, callback);
     }
 }
 
@@ -150,7 +151,7 @@ StorageManaer.readPreviousBlock = function (file, memPage, callback) {
  * @param {Buffer} memPage 
  */
 StorageManaer.readCurrentBlock = function (file, memPage, callback) {
-    StorageManaer.readBlock(file.curPagePos, callback);
+    StorageManaer.readBlock(file.curPagePos, file,memPage, callback);
 }
 
 
@@ -165,7 +166,7 @@ StorageManaer.readNextBlock = function (file, memPage, callback) {
         callback(new DBErrors("No more pages", DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY));
     } else {
         file.curPagePos++;
-        StorageManaer.readBlock(file.curPagePos, memPage, callback);
+        StorageManaer.readBlock(file.curPagePos, file,memPage, callback);
     }
 }
 
@@ -177,7 +178,7 @@ StorageManaer.readNextBlock = function (file, memPage, callback) {
  * @param {Buffer} memPage 
  */
 StorageManaer.readLastBlock = function (file, memPage, callback) {
-    StorageManaer.readBlock(file.totalPageNumber - 1, memPage, callback);
+    StorageManaer.readBlock(file.totalPageNumber - 1, file,memPage, callback);
 }
 
 /**
@@ -188,16 +189,28 @@ StorageManaer.readLastBlock = function (file, memPage, callback) {
  * @param {Buffer} memPage -buffer contains the data writting to the disk
  */
 StorageManaer.writeBlock = function (pageNum, file, memPage, callback) {
-    if (pageNum => file.totalPageNumber) {
+    //console.log('in '+file.totalPageNumber);
+    if (pageNum >= file.totalPageNumber) {
         callback(new DBErrors('Out of max pags number', DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY))
     } else {
-        file.curPagePos = pageNum;
         fs.write(file.fd, memPage, 0, PAGE_SIZE, PAGE_SIZE * pageNum, function (err, bytesWritten, buffer) {
             callback(err);
         });
     }
 
 }
+StorageManaer.writeBlockMul = function (pageNum, file, memPage, callback) {
+    //console.log('in '+file.totalPageNumber);
+    if (pageNum >= file.totalPageNumber) {
+        callback(new DBErrors('Out of max pags number', DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY))
+    } else {
+        fs.createReadStream()
+    }
+
+}
+
+
+
 
 /**
  * Write Current BLock
@@ -218,7 +231,9 @@ StorageManaer.writeCurrentBlock = function (file, memPage, callback) {
  */
 StorageManaer.appendEmptyBlock = function (file, callback) {
     file.totalPageNumber++;
-    StorageManaer.writeBlock(file.totalPageNumber - 1, file, Buffer.alloc(PAGE_SIZE), callback);
+    var buf = Buffer.alloc(PAGE_SIZE);
+    buf[PAGE_SIZE - 1] = '\0';
+    StorageManaer.writeBlock(file.totalPageNumber - 1, file, buf, callback);
 }
 
 /**
@@ -230,7 +245,7 @@ StorageManaer.appendEmptyBlock = function (file, callback) {
 StorageManaer.ensureCapacity = function (numberOfPages, file, callback) {
     if (numberOfPages > file.totalPageNumber) {
         pages = PAGE_SIZE * (numberOfPages - file.totalPageNumber);
-        fs.write(file.fd, Buffer.alloc(pages), 0, pages, pages, function (err, bytesWritten, buffer) {
+        fs.write(file.fd, Buffer.alloc(pages).fill(' '), 0, pages, PAGE_SIZE*file.totalPageNumber, function (err, bytesWritten, buffer) {
             if (!err)
                 file.totalPageNumber = numberOfPages;
             callback(err, file);
@@ -241,5 +256,6 @@ StorageManaer.ensureCapacity = function (numberOfPages, file, callback) {
 }
 
 StorageManaer.PAGE_SIZE = PAGE_SIZE;
+StorageManaer.CODING = CODING;
 
 module.exports = StorageManaer;
