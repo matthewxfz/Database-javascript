@@ -1,3 +1,4 @@
+'use strict';
 var fs = require('fs')
     , mkdirp = require('mkdirp')
     , async = require('async')
@@ -110,7 +111,7 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
             if (err) {
                 err = DBErrors('Operation not permited', DBErrors.type.RC_READ_FAILED);
             }
-            callback(err, memPage);
+            callback(err, buffer);
         });
     }
 }
@@ -244,7 +245,7 @@ StorageManaer.appendEmptyBlock = function (file, callback) {
  */
 StorageManaer.ensureCapacity = function (numberOfPages, file, callback) {
     if (numberOfPages > file.totalPageNumber) {
-        pages = PAGE_SIZE * (numberOfPages - file.totalPageNumber);
+        var pages = PAGE_SIZE * (numberOfPages - file.totalPageNumber);
         fs.write(file.fd, Buffer.alloc(pages).fill(' '), 0, pages, PAGE_SIZE*file.totalPageNumber, function (err, bytesWritten, buffer) {
             if (!err)
                 file.totalPageNumber = numberOfPages;

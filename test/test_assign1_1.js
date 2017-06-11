@@ -1,3 +1,4 @@
+'use strict';
 const assert = require('assert')
   , sm = require('../src/StorageManager.js')
   , path = require('path')
@@ -92,13 +93,13 @@ describe('Test open, write, read, and close', function () {
   it('Ensure there is 3 pages capacity, 2 more empty pages are expected to be added', function () {
     sm.openPageFile(filename, file, function () {
       sm.ensureCapacity(3, file, function (err, memPage) {
-        if (err) console.error(err)
-        //console.log(file.totalPageNumber + ', ' + file.fileName);
+        console.log('ensure'+file.totalPageNumber + ', ' + file.fileName);
         assert.equal(3, file.totalPageNumber);
         assert.equal(0, memPage[4096]);
         assert.equal(0, memPage[8198]);
       })
     })
+    sleep.msleep(50);
   })
 
   it('Write 1,2,3 Block and should the read content should be the same', function () {
@@ -128,52 +129,48 @@ describe('Test open, write, read, and close', function () {
     });//open file
   });//test case 
 
-  it('Read current, previous, and next block of 2nd block', function () {
-    async.series([
-      function (cb) {//current
-        file.curPagePos = 1;
-        var buf = Buffer.alloc(sm.PAGE_SIZE, 'b', sm.CODING);
-        //console.log('read '+file.fileName+', '+file.fd)
-        sm.readCurrentBlock(file, tmp, function (err) {
-          //onsole.log(tmp.toString())
-          assert.equal(0, buf.compare(tmp));
-          cb()
-        })
-      },
-      // function (cb) {//previous
-      //   file.curPagePos = 1;
-      //   buf = Buffer.alloc(sm.PAGE_SIZE, 'a', sm.CODING);
-      //   sm.readPreviousBlock(file, tmp, function (err) {
-      //     ///console.log('buf' + buf[0] + '. tmp' + tmp[0]);
-      //     assert(0, buf.compare(tmp));
-      //     cb()
-      //   })
-      // },
-      // function(cb) {//next
-      //   file.curPagePos = 1;
-      //   buf = Buffer.alloc(sm.PAGE_SIZE, 'c', sm.CODING);
-      //   sm.readNextBlock(file, tmp, function (err) {
-      //     assert.equal(0, buf.compare(tmp));
-      //   })
-      }
-    ], function (err) {
-        if(err) console.error(err);
-    });
+  it('Read current block of 2nd block', function () {
+    file.curPagePos = 1;
+    var buf = Buffer.alloc(sm.PAGE_SIZE, 'b', 'utf8');
+    sm.readCurrentBlock(file, Buffer.alloc(sm.PAGE_SIZE, ' ', 'utf8'), function (err, rbuf) {
+      console.log('file: '+file.curPagePos+', '+file.totalPageNumber);
+      assert(0, buf.compare(rbuf));
+    })
+    // sm.readCurrentBlock(file, Buffer.alloc(sm.PAGE_SIZE,'','utf8'), function (err, rbuf) {
+    //   assert.equal(buf.compare(rbuf));
+    // })
   })
 
-  // it('Read last block of 2nd block', function () {
-  //   file.curPagePos = 1;
-  //   buf = Buffer.alloc(sm.PAGE_SIZE, 'c', sm.CODING);
-  //   sm.readLastBlock(file, tmp, function (err) {
-  //     assert.equal(0, buf.compare(tmp));
-  //   })
-  // })
+  it('Read previous block of 2nd block', function () {
+    file.curPagePos = 1;
+    buf = Buffer.alloc(sm.PAGE_SIZE, 'a', 'utf8');
+    sm.readPreviousBlock(file, Buffer.alloc(sm.PAGE_SIZE, ' ', 'utf8'), function (err, rbuf) {
+      assert.equal(buf.compare(rbuf));
+    })
+  })
 
-  // it('Read first block of 2nd block', function () {
-  //   file.curPagePos = 1;
-  //   buf = Buffer.alloc(sm.PAGE_SIZE, 'a', sm.CODING);
-  //   sm.readFirstBlock(file, tmp, function (err) {
-  //     assert.equal(0, buf.compare(tmp));
-  //   })
-  // });//it
+  it('Read previous block of 2nd block', function () {
+    file.curPagePos = 1;
+    buf = Buffer.alloc(sm.PAGE_SIZE, 'c', 'utf8');
+    sm.readNextBlock(file, Buffer.alloc(sm.PAGE_SIZE, ' ', 'utf8'), function (err, rbuf) {
+      assert.equal(buf.compare(rbuf));
+    })
+  })
+
+  it('Read previous block of 2nd block', function () {
+    file.curPagePos = 1;
+    buf = Buffer.alloc(sm.PAGE_SIZE, 'c', 'utf8');
+    sm.readLastBlock(file, Buffer.alloc(sm.PAGE_SIZE, ' ', 'utf8'), function (err, rbuf) {
+      assert.equal(buf.compare(rbuf));
+    })
+  })
+
+  it('Read previous block of 2nd block', function () {
+    file.curPagePos = 1;
+    buf = Buffer.alloc(sm.PAGE_SIZE, 'a', 'utf8');
+    sm.readFirstBlock(file, Buffer.alloc(sm.PAGE_SIZE, ' ', 'utf8'), function (err, rbuf) {
+      assert.equal(buf.compare(rbuf));
+    })
+  })
+
 });

@@ -1,3 +1,4 @@
+'use strict';
 var sm = require('./StorageManager')
     , fs = require('fs')
     , File = require('./File')
@@ -9,12 +10,12 @@ var filename = 'file.test',
     fileName2 = "/Users/matthewxfz/Workspaces/tmp/fake.test",
     file,
     buf;
-fd = fs.openSync(fileName, 'w+');
+var fd = fs.openSync(filename, 'w+');
 
 file = new File(fd, util.parseFileName(fileName), util.parseFilePath(fileName), 2, 0);
 
 buf = Buffer.allocUnsafe(4096);
-for (i = 0; i < 256; i++) {
+for (var i = 0; i < 256; i++) {
     buf.write('0123456789abcdef', i * 16);
 }
 
@@ -27,9 +28,9 @@ sm.createPageFile(filename, function (fd) {
         sm.readFirstBlock(file, Buffer.alloc(sm.PAGE_SIZE), function (err, memPage) {
             console.log(memPage[0]);
         });
-        // sm.ensureCapacity(3, file, function (err, memPage) {
-        //     console.log(file.totalPageNumber);
-        // })
+        sm.ensureCapacity(3, file, function (err, memPage) {
+            console.log(file.totalPageNumber);
+        })
     });
 });
 
