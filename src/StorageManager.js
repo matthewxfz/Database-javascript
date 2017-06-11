@@ -192,20 +192,11 @@ StorageManaer.readLastBlock = function (file, memPage, callback) {
 StorageManaer.writeBlock = function (pageNum, file, memPage, callback) {
     //console.log('in '+file.totalPageNumber);
     if (pageNum >= file.totalPageNumber) {
-        callback(new DBErrors('Out of max pags number', DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY))
+        callback(new DBErrors('Out of max pags number', DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY), null)
     } else {
         fs.write(file.fd, memPage, 0, PAGE_SIZE, PAGE_SIZE * pageNum, function (err, bytesWritten, buffer) {
-            callback(err);
+            callback(err,buffer);
         });
-    }
-
-}
-StorageManaer.writeBlockMul = function (pageNum, file, memPage, callback) {
-    //console.log('in '+file.totalPageNumber);
-    if (pageNum >= file.totalPageNumber) {
-        callback(new DBErrors('Out of max pags number', DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY))
-    } else {
-        fs.createReadStream()
     }
 
 }

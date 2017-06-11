@@ -90,55 +90,34 @@ describe('Test open, write, read, and close', function () {
       })
     });
   })
-  it('Ensure there is 3 pages capacity, 2 more empty pages are expected to be added', function () {
+  
+  it('Ensure there is 3 pages capacity, wirte 1,2,3 bocks should be successfull', function () {
     sm.openPageFile(filename, file, function () {
       sm.ensureCapacity(3, file, function (err, memPage) {
-        console.log('ensure'+file.totalPageNumber + ', ' + file.fileName);
+        //console.log('ensure'+file.totalPageNumber + ', ' + file.fileName);
         assert.equal(3, file.totalPageNumber);
-        assert.equal(0, memPage[4096]);
-        assert.equal(0, memPage[8198]);
+        this.writeThreeBlocks();
       })
     })
-    sleep.msleep(50);
-  })
+    
+  });
 
-  it('Write 1,2,3 Block and should the read content should be the same', function () {
-    sm.openPageFile(filename, file, function () {
-      async.waterfall([
-        function (cb) {
-          buf = Buffer.alloc(sm.PAGE_SIZE, 'a');
-          sm.writeBlock(0, file, buf, function () {
-            cb(null, file);
-          });
-        },
-        function (file, cb) {
-          buf = Buffer.alloc(sm.PAGE_SIZE, 'b');
-          sm.writeBlock(1, file, buf, function () {
-            cb(null, file);
-          })
-        },
-        function (file, cb) {
-          buf = Buffer.alloc(sm.PAGE_SIZE, 'c');
-          sm.writeBlock(2, file, buf, function () {
-            cb(null);
-          })
-        },
-      ], function (err) {
-        if (err) console.error(err);
-      });//async
-    });//open file
-  });//test case 
+  it('Ensure capacity larger than current one should not change maximum pages', function () {
+      sm.openPageFile(filename, file, function () {
+      sm.ensureCapacity(4, file, function (err, memPage) {
+        //console.log('ensure'+file.totalPageNumber + ', ' + file.fileName);
+        assert.equal(3, file.totalPageNumber);
+      })
+    })
+  });
 
   it('Read current block of 2nd block', function () {
     file.curPagePos = 1;
     var buf = Buffer.alloc(sm.PAGE_SIZE, 'b', 'utf8');
     sm.readCurrentBlock(file, Buffer.alloc(sm.PAGE_SIZE, ' ', 'utf8'), function (err, rbuf) {
-      console.log('file: '+file.curPagePos+', '+file.totalPageNumber);
+      if(err) console.error(err.literalCode);
       assert(0, buf.compare(rbuf));
     })
-    // sm.readCurrentBlock(file, Buffer.alloc(sm.PAGE_SIZE,'','utf8'), function (err, rbuf) {
-    //   assert.equal(buf.compare(rbuf));
-    // })
   })
 
   it('Read previous block of 2nd block', function () {
@@ -149,7 +128,7 @@ describe('Test open, write, read, and close', function () {
     })
   })
 
-  it('Read previous block of 2nd block', function () {
+  it('Read next block of 2nd block', function () {
     file.curPagePos = 1;
     buf = Buffer.alloc(sm.PAGE_SIZE, 'c', 'utf8');
     sm.readNextBlock(file, Buffer.alloc(sm.PAGE_SIZE, ' ', 'utf8'), function (err, rbuf) {
@@ -157,7 +136,7 @@ describe('Test open, write, read, and close', function () {
     })
   })
 
-  it('Read previous block of 2nd block', function () {
+  it('Read last block of 2nd block', function () {
     file.curPagePos = 1;
     buf = Buffer.alloc(sm.PAGE_SIZE, 'c', 'utf8');
     sm.readLastBlock(file, Buffer.alloc(sm.PAGE_SIZE, ' ', 'utf8'), function (err, rbuf) {
@@ -165,7 +144,7 @@ describe('Test open, write, read, and close', function () {
     })
   })
 
-  it('Read previous block of 2nd block', function () {
+  it('Read frist block of 2nd block', function () {
     file.curPagePos = 1;
     buf = Buffer.alloc(sm.PAGE_SIZE, 'a', 'utf8');
     sm.readFirstBlock(file, Buffer.alloc(sm.PAGE_SIZE, ' ', 'utf8'), function (err, rbuf) {
@@ -174,3 +153,30 @@ describe('Test open, write, read, and close', function () {
   })
 
 });
+
+this.writeThreeBlocks = function () {
+    sm.openPageFile(filename, file, function () {
+      buf = Buffer.alloc(sm.PAGE_SIZE, 'a', sm.COING);
+      sm.writeBlock(0, file, buf, function (err, buf) {
+        if (err) console.error(err)
+        else {
+          assert('a', buf[0]);
+          buf = Buffer.alloc(sm.PAGE_SIZE, 'b', sm.COING);
+          sm.writeBlock(1, file, buf, function (err, buf) {
+            if (err) console.error(err)
+            else {
+              assert('b', buf[4096]);
+              buf = Buffer.alloc(sm.PAGE_SIZE, 'c', sm.COING);
+              sm.writeBlock(2, file, buf, function (err, buf) {
+                if (err) console.error(err)
+                else {
+                  assert('c', buf[4096 * 2]);
+                }
+              });
+            }
+          });
+        }
+
+      });//sm.write
+    });//open file
+  }
