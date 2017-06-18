@@ -63,7 +63,13 @@ Part 1- Buffer Manager
 The goal of this assignment is to implement a buffer manager which manages a fixed number of pages in memory that represent pages from a page file managed by the storage manager.The Buffer manager should be able to handle more than one open buffer pool at the same time or one open buffer pool for each page file. FIFO and LRU replacement strategy implementations are required.
 
 #Instruction of running program:
+1. unpack the zip file to local
+2. direct to the <rootworkpath>
+3. run command: npm install mocha -g
+4. To run the test case, run command: mocha
 
+#dependency
+./package.json
 
 #layout
 
