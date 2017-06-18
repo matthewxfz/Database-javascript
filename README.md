@@ -57,3 +57,41 @@ from a file on disk into memory and writing blocks from memory to a file on disk
 14. appendEmptyBlock	Write an empty block at the end of the file.
 
 15. ensureCapacity		If the totalPageNumber is less than numberOfPages then add pages until it equals to the numberOfPages.
+
+
+Part 1- Buffer Manager
+The goal of this assignment is to implement a buffer manager which manages a fixed number of pages in memory that represent pages from a page file managed by the storage manager.The Buffer manager should be able to handle more than one open buffer pool at the same time or one open buffer pool for each page file. FIFO and LRU replacement strategy implementations are required.
+
+#Instruction of running program:
+
+
+#layout
+
+
+#API
+
+1.  initBufferPool: initialize buffer pool
+
+2.  shutdownBufferPool: shut down buffer pool
+
+3.  forceFlushPool: write data of all dirty pages in buffer pool back page file
+
+4.  markDirty: Mark a page dirty
+
+5.  unpinPage: unpin a page
+
+6.  forcePage: write data of a page in buffer pool back page file
+
+7.  pinPage: pin a page
+
+8.  getDirtyFlags: return all dirty page number
+
+9.  getFixCounts: return fixcount
+
+10. getNumReadIO: return the number of pages read from page file
+
+11. getNumWriteIO: return the number of pages write into page file
+
+12. FIFO: FIFO replacement strategy
+
+13. LRU: LRU replacement strategy
