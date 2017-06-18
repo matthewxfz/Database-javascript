@@ -5,7 +5,7 @@ function pageFrame(){
 	numWriteIO = 0,
 	fixCount = 0,
 	dirtyFlag = false,
-	clockFlag; = false,
+	clockFlag = false,
 	previous = null;
 	next = null;
 }

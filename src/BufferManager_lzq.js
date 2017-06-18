@@ -1,261 +1,293 @@
-var sm = require('../src/StorageManager.js'),
-	bm = require('../src/BufferManager.js');
+'use strict'
+const DBErrors = require('./DBErrors'),
+	mkdirp = require('mkdirp'),
+	async = require('async'),
+	path = require('path'),
+	BufferManager = {},
+	fs = require('fs'),
+	assert = require('assert'),
+	sm = require('./StorageManager');
 
-/*
-Replacement strategy: FIFO
-@param bm: bufferpool
-@param bmHandle: to handle the information of requested page
-@param PageNum: the requested pagenumber
-return: bmHandle
-*/
-function FIFO(bm,bmHandle,PageNum){
-	var pagelist = bm.mgmtData;
-	/*
-	The requested page is found in the bufferpool,return bmhandle
-	*/
-	if(searchPage(bm,bmHandle,PageNum)){
-		console.log('Page Found!');
-		return bmHandle;
-	}
-	/*
-	The requested page is not found in the bufferpool,if the bufferpool is not full,
-	append the page at the end of the bufferpool,otherwise,replace the page in bufferpool
-	with FIFO strategy.	
-	*/
-	if(pagelist.size < bm.numPages){
-		appendPage(bm,bmHandle,pageNum);
-	}else{
-		pagelist.current = pagelist.head;
-		while(pagelist.current != null || pagelist.current.fixCount != 0){
-			pagelist.current = pagelist.current.next;
+var ReplacementStrategy = {
+	RS_FIFO: 0,
+	RS_LRU: 1,
+	RS_CLOCK: 2,
+	RS_LFU: 3,
+	RS_LRU_K: 4
+},
+	PAGE_SIZE = sm.PAGE_SIZE,
+	CODING = sm.CODING,
+	Heap = require('heap'),
+	LoopQueue = require('./LoopQueue');
+
+/**
+ * Element of the pageData array, describe extral information of page.
+ * 
+ * @param {any} storagePage 
+ * @param {any} dirty 
+ * @param {any} fixcount 
+ */
+var pageInfo = function (storagePage, dirty, fixcount) {
+	var storge_page;
+	var dirty;
+	var fixcount;
+}
+
+/**
+ * tores information about a buffer pool: 
+ * the name of the page file associated with the buffer pool (pageFile), 
+ * the size of the buffer pool, i.e., the number of page frames (numPages), 
+ * the page replacement strategy (strategy), and a pointer to bookkeeping data (mgmtData). 
+ * mgmData is an array that use the first one byte of   
+ * 
+ * @param {string} pageFile 
+ * @param {int} numPages -number of pages in total
+ * @param {ReplacementStrategy} strategy 
+ * @param {Array[]} storage_page_map
+ * @param {Array[]} dirty
+ * @param {Array[]} fixcount
+ *  
+ */
+function BM_BufferPool(pageFile, numPages, strategy, storage_page_map, dirty, fixcount) {
+	this.pageFile = page;
+	this.numPages = numPages;
+	this.strategy = strategy;
+	this.storage_page_map = storage_page_map;
+	this.dirty = dirty;
+	this.fixcount = fixcount;
+}
+
+BM_BufferPool.toString = function () {
+	return 'hello ' + pageFile + ', ' + numPages + ', ' + strategy + ', ' + storage_page_map.toString() + ', ' + dirty.toString() + ', ' + fixcount.toString();
+}
+/**
+ *The BM_PageHandle stores information about a page. 
+ *The page number (position of the page in the page file) is stored in pageNum. 
+ *The page number of the first data page in a page file is 0. The data field points to the area in memory storing the content of the page. This will usually be a page frame from your buffer pool.
+ * 
+ * @param {any} pageNum 
+ */
+function BM_PageHandle(pageNum) {
+	this.pageNum = pageNum;
+}
+
+/**
+ *  creates a new buffer pool with numPages page frames using the page replacement strategy strategy. 
+ * The pool is used to cache pages from the page file with name pageFileName. 
+ * Initially, all page frames should be empty. 
+ * The page file should already exist, i.e., this method should not generate a new page file. 
+ * stratData can be used to pass parameters for the page replacement strategy. 
+ * 
+ * @param {BM_BufferPool} bp 
+ * @param {char} pageFileName path to the file
+ * @param {int} numPages 
+ * @param {ReplacementStrategy} strategy 
+ * @param {any} stratData 
+ */
+BufferManager.initBufferPool = function (bp, pageFileName, numPages, strategy, startData) {
+	var fd;
+	try {
+		fd = fs.openSync(pageFileName, 'w+');
+		bp.pageFile = pageFileName;
+		switch (bp.strategy) {
+			case 0:
+				bp.queue = new Array(numPages);
+				break;
+			case 1:
+				bp.heap = new Heap();
+				break;
+			case 2:
+				bp.loopQueue = new LoopQueue(numPages);
+				break;
+			default:
 		}
-		if(pagelist.current == null)
-			return DBErrors.RC_NO_PAGE_REMOVEALBE
-		replacePage(pagelist,bmHandle,pageNum);
-	}
-	return bmHandle;
-}
-/*
-Method to search the requested page in bufferpool
-@param bm: bufferpool
-@param bmHandle: handle the information about the page if it is found
-@param pageNum: the requested pageNumber
-return: boolean value
-*/
-function searchPage(bm,bmHandle,pageNum){
-	var pagelist = bm.mgmtData;
-	/*
-	searching the whole pagelist to find the requested page, 
-	put information of the page into bmhandle and return true,
-	otherwise, return false
-	*/
-	pagelist.current = pagelist.head;
-	while(pagelist.current != null && pagelist.current.pageNum != PageNum){
-		pagelist.current = pagelist.current.next;
-	}
-	//check if the page is found
-	if(pagelit.current == null)
-		return false;
-	/*
-	the requested page is found
-	put information of the page into bmhandle
-	fixCount and numReadIO increase by 1
-	*/
-	bmHandle.pageNum = pagelist.current.pageNum;
-	bmHandle.data = pagelist.current.data;
-	pagelist.current.numReadIO++;
-	return true;
-}
-/*
-Method to add new page at the end of pagelist if pagelist is not empty,
-otherwise,add new page as the head of pagelist
-@param bm: bufferpool
-@param bmHandle: handle the information of page to add
-@param pageNum: the requested pageNumber
-*/
-function appendPage(bm,bmHandle,pageNum){
-	var pagelist = bm.mgmtData;
-	file.curPagePos = pageNum;
-	//open pagefile and read the requested page into bufferpool
-	sm.openPageFile(bm.pageFile,file,function(){
-		sm.readCurrentBlock(file,Buffer.alloc(PAGE_SIZE,' ',uft8),function(err,rbuf){
-			if(err) throw err;
-			var page = new pageFrame();
-				bmHandle.data = rbuf;
-				bmHandle.pageNum = pageNum;
-				page.page = bmHandle;
-				page.fixCount++;
-				page.numReadIO++;
-			/*
-			if the pagelist is empty,put new page as the head of pagelist,
-			otherwise,add new page at the end of pagelist
-			*/
-			if(pagelist.size == 0){
-				pagelist.head = pagelist.tail = page;
-			}else{
-				page.previous = pagelist.tail;
-				pagelist.tail.next = page;
-				pagelist.tail = pagelist.tail.next;
+		bq.queueLength = 0;
+		if (strategy < 0 || strategy > 3) {
+			throw new DBErrors('No such strategy!', DBErrors.type.RC_RM_UNKOWN_DATATYPE);
+		} else {
+			bp.strategy = strategy;
+			try {
+				bp.numPages = numPages;
+				initSpace(numPages, startData, bp);
+			} catch (error) {
+				throw error;
 			}
-			sm.closePageFile(bm.pageFile);
-		})	
-	})
-}
-/*
-Method to replace page in pagelist.
-if the page is dirty,write it into file then replace it,
-otherwise,replace it.
-@param bm: bufferpool
-@param bmHandle: handle the info of request page
-@param pageNum: the requested pageNumber
-*/
-function replacePage(bm,bmHandle,pageNum) {
-	var pagelist = bm.mgmtData;
-	/*
-	if the current page is dirty,open pagefile and write it into pagefile
-	*/
-	if(pagelist.current.dirty == true){
-		sm.openPageFile(fileName,file,function() {
-			var buf = Buffer.alloc(PAGE_SIZE,pagelist.current.page.data,uft8);
-			buf[PAGE_SIZE - 1] = '/0';
-			sm.writeBlock(file.totalPageNumber - 1, file, buf, function() {
-				pagelist.current.numWriteIO++;
-				pagelist.current.fixCount++;
-				sm.closePageFile(file);
-			});
-		});
-	}
-	sleep.mslsleep(1);
-	/*
-	open pagefile and read requested page and replace the page in pagelist
-	*/
-	sm.openPageFile(bm.pageFile,file,function(){
-		sm.readCurrentBlock(file,Buffer.alloc(PAGE_SIZE,' ',uft8),function(err,rbuf){
-			if(err) throw err;
-			var page = new pageFrame();
-				bmHandle.data = rbuf;
-				bmHandle.pageNum = pageNum;
-				page.page = bmHandle;
-				page.fixCount++;
-				page.numReadIO++;
-			/*
-			if the replaced page is not the tail of pagelist,
-			move the page into the tail of pagelist
-			*/
-			if(pagelist.current != pagelist.tail){
-			pagelist.current.next.previous = pagelist.current.previous;
-			pagelist.current.previous.next = pagelist.current.next;
-			pagelist.current.previous = pagelist.tail;
-			pagelist.current.next = null;
-			pagelist.tail = pagelist.tail.next;
-			}
-			pagelist.current.page.data = bmHandle.data;
-			pagelist.current.page.pageNum = bmHandle.pageNum;
-			pagelist.current.fixCount = 1;
-			pagelist.current.numReadIO = 1;
-			pagelist.current.numWriteIO = 0;
-			pagelist.dirty = false;
-			sm.closePageFile(bm.pageFile);
-		})
-	})
-	
-}
-/*
-Replacement strategy: LRU
-@param bm: bufferpool
-@param bmHandle: handle the requested page
-@param pageNum: the requested pageNumber
-*/
-function LRU(bm,bmHandle,pageNum){
-	var pagelist = bm.mgmtData;
-	/*
-	if the requested page is found,return the info of the page
-	and move this page to be the end of pagelist
-	*/
-	if(searchPage(bm,bmHandle,pageNum)){
-		pagelist.current.previous.next = pagelist.current.next;
-		pagelist.current.next.previous = pagelist.current.previous;
-		pagelist.current.previous = pagelist.tail.next;
-		pagelist.current.next = null;
-		pagelist.tail = pagelist.tail.next;
-		return bmHandle;
-	}
-	if(pagelist.size < bm.numPages){
-		appendPage(bm,bmHandle,pageNum);
-	}else{
-		/*
-		if the requested page is not in pagelist,then looking for
-		the least recently used page
-		*/
-		pagelist.current = pagelist.head;
-		while(pagelist.current != null && pagelist.current.fixCount != 0){
-		pagelist.current = pagelist.current.next;
 		}
-		/*
-		No removeable page is found
-		*/
-		if(pagelist.current == null)
-			return RC_NO_PAGE_REMOVEALBE;
-		/*
-		Removeable page is found
-		*/
-		replacePage(pagelist,bmHandle,pageNum);
-
+	} catch (error) {
+		throw error;
 	}
-	return bmHandle;	
 }
 
-function initBufferPool(bm,fileName,numPages,strategy,mgmtData){
-	bm.pageFile = fileName;
-	bm.numPages = numPages;
-	bm.strategy = strategy;
-	bm.mgmtData = mgmtData;
+function initSpace(numPages, startData, bp) {
+	startData = Buffer.alloc(sm.PAGE_SIZE * numPages, ' ', sm.CODING);
+	bp.storage_page_map = new Array(numPages);
+	bp.fixcount = new Array(numPages);
+	bp.dirty = new Array(numPages);
 }
 
-function shutdownBufferPool(bm){
-	pagelist = bm.mgmtData;
-	pagelist.current = pagelist.head;
-	file.curPagePos = 0;
-	forceFlushPool(bm);
+/**
+ * destroys a buffer pool. 
+ * This method should free up all resources associated with buffer pool. 
+ * For example, it should free the memory allocated for page frames. 
+ * If the buffer pool contains any dirty pages, then these pages should be written back to disk before destroying the pool. 
+ * It is an error to shutdown a buffer pool that has pinned pages.
+ * 
+ * @param {any} bp 
+ * @param {any} callback 
+ */
+BufferManager.shutdownBufferPool = function (bp) {
+	if (bp.mgmtData = undefined)
+		throw new DBErrors('Buffer pool Not defined!');
+	else
+		//check if there is pin page
+		for (var i = 0; i < bp.fixcount.length; i++) {
+			if (bo.fixcount[i] != 0) {
+				throw DBErrors('Still one page is pinned!');
+			}
+		}
+	//Objects (including Buffers) are tracked by the garbage collector and deallocated when there are no more references to it
+
+	//WRITE DIRTYR PAGE BACK TO THE DISK
+	forceFlushPool(bp);
 }
-/*
-Method to write all dirty page into pagefile
-@param bm: bufferpool
-*/
-function forceFlushPool(bm){
-	sm.openPageFile(bm.pageFile,file,function(){
-		while(pagelist.current != null){
-			if(pagelist.current.dirty == true){
-				sm.writeCurrentBlock(file,pagelist.current.page.data,function(err){
-					if(err) throw err;
+
+/**
+ * causes all dirty pages (with fix count 0) from the buffer pool to be written to disk.
+ * 
+ * @param {any} bp 
+ */
+BufferManager.forceFlushPool = function (bp) {
+	sm.openPageFile(bp.pageFile, file, function (err, file) {
+		for (file.curPagePos = 0; file.curPagePos < bp.numPages; file.curPagePos++) {
+			if (bp.dirty[file.curPagePos] == 0) {
+				sm.writeCurrentBlock(file, pagelist.current.page.data, function (err) {
+					if (err) throw err
+					else
+						bp.dirty[file.curPagePos] = 0;
 				});
-				file.curPagePos++;
 			}
 		}
-		sm.closePageFile(bm.pageFile);
+		while (isAllZero(bp.dirty)) { }; //wait for all the work
+		sm.closePageFile(file, function (err) {
+			if (err) throw err;
+		});//async close
 	});
 }
-/*
-Method to pin a page
-@param bm: bufferpool
-@param bmHandle: handle the requested page
-@param pageNum: the requested pageNumber
-*/
-function pinPage(bm,bmHandle,pageNum){
-	if(bm.strategy == 0){
-		FIFO(bm,bmHandle,PageNum);
-	}else if(bm.strategy == 1){
-		LRU(bm,bmHandle,pageNum)
+
+function isAllZero(array) {
+	var result = 0;
+	for (var i = 0; i < array; i++) {
+		result = result | array[i];
+		if (result > 0)
+			return false;
+	}
+
+	return true;
+}
+
+function findFilePageId(bp, memPage) {
+	return bp.storage_page_map[memPage];
+}
+
+function findMemPageId(bp, filePage) {
+	for (var i = 0; i < bp.numPages; i++) {
+		if (bp.storage_page_map[i] == filePage)
+			return i;
+	}
+	throw new DBErrors('The file page is out of bp');
+}
+
+/**
+ * marks a page as dirty.
+ * 
+ * @param {BM_BufferPoort} bp 
+ * @param {BM_PageHandle} page
+ */
+BufferManager.markDirty = function (bp, page) {
+	bp.dirty[page.pageNum] = 1;
+}
+
+/**
+ * unpins the page page. 
+ * 
+ * @param {BM_BufferPoort} bp 
+ * @param {BM_PageHandle} page
+ */
+BufferManager.unpinPage = function (bp, page) {
+	if (bp.fixcount[page.pageNum] > 0)
+		bp.fixcount[page.pageNum]--;
+}
+
+/**
+ * pinPage pins the page with page number pageNum. 
+ * The buffer manager is responsible to set the pageNum field of the page handle passed to the method. 
+ * Similarly, the data field should point to the page frame the page is stored in (the area in memory storing the content of the page).
+ * 
+ * @param {any} bp 
+ * @param {BM_PageHandle} page - page in the file
+ */
+BufferManager.pinPage = function (bp, page) {
+	switch (bp.strategy) {
+		case 0:
+			break;
+		case 1:
+			break;
+		case 2:
+			break;
+		default:
 	}
 }
-/*
-Method to pin a page
-@param bm: bufferpool
-@param bmHandle: handle the requested page
-*/
-function unpinPage(bm,bmHandle){
-	var pagelist = bm.mgmtData;	
-	if(searchPage(pagelist,bmHandle,bmHandle.pageNum)){
-		pagelist.current.fixCount--;
+
+function fifo_pinPage(bp, page) {
+	if (bp.queue == undefined) {
+		throw Error('The FIFO queue is not defined!');
+	}
+	if (findMemPageId(page.pageNum)) {//if the page is in the buffer
+		fixcount[page.pageNum]++;
+	} else {
+		if (page.pageNum > bq.queueLength) {// the queue is not full
+			// sm.openPageFile(filename, file, function () {
+			//     sm.writeBlock(0, file, buf, function (err, buf) {
+
+			//     });
+			// });
+			var avaFrame = findAvalableBuffer(bp);
+
+			//write data from file to the buffer
+			//update map, dirty, and queue
+			bp.storage_page_map[avaFrame] = page.pageNum;
+			dirty[avaFrame] = 0;
+			bp.queue.push(avaFrame);
+			bq.queueLength++;
+		} else {
+			var avaFrame = bp.queue.pop();
+
+			//write data from file to the buffer
+			//update map, dirty, and queue
+			bp.storage_page_map[avaFrame] = page.pageNum;
+			dirty[avaFrame] = 0;
+			bp.queue.push(avaFrame);
+		}
 	}
 }
+
+function findAvalableBuffer(bp) {
+	for (var i = 0; i < bp.numPages; i++) {
+		if (bp.storage_page_map[i] != undefined) {
+			return i;
+		}
+	}
+}
+
+BufferManager.forcePage = function (bp, page) {
+	sm.openPageFile(filename, file, function () {
+		buf = Buffer.alloc(sm.PAGE_SIZE, 'a', sm.COING);
+		sm.writeBlock(0, file, buf, function (err, buf) {
+		});
+	});
+}
+
+
+BufferManager.ReplacementStrategy = ReplacementStrategy;
+
+module.exports = BufferManager;

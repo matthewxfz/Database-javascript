@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/matthewxfz/Database-javascript#readme",
   "dependencies": {
+    "heap": "^0.2.6",
     "mocha": "^3.4.2",
     "sleep": "^5.1.1"
   }
