@@ -12,6 +12,16 @@ i = 0;
 bp.fixCount = [];
 bp.dirty = [];
 bp.storage_page_map = [];
+
+    /**
+     * Return if the intput data fits the expect result?
+     * 
+     * @param {BM_BufferPool} bp -- buffer pool
+     * @param {string} [str=[i]]  --expect result in a moment i
+     */
+    function bmTestHelper(bp, str[i]){
+        return;
+    }
 function FIFOtest(bp,i){
     var count = 0;
     for(var op in str){
