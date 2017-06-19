@@ -26,7 +26,7 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
 }
 
 
-testBP();
+testLRU();
 
 
 
@@ -88,13 +88,32 @@ function testFIFO() {
     var data;
     var page = new BM_PageHandle(1, data);
     bm.initBufferPool(bp, fileName, 3, bm.ReplacementStrategy.RS_FIFO, page);
-    for (var i = 0; i < 5; i++) {
+    for (var i = 0; i < 22; i++) {
         page.pageNum = i;
         bm.pinPage(bp, page, i);
         bm.markDirty(bp, page);
         bm.unpinPage(bp, page);
         console.log('Page, ' + page.pageNum + ', ' + page.data + ', ' + bp.dirty[page.data] + ', fixcount, ' + bp.fixcount[page.data]);
     }
+
+    bm.shutdownBufferPool(bp);
+}
+
+function testLRU() {
+    var file = new File();
+
+    var bp = new BM_BufferPool(fileName, 1, bm.ReplacementStrategy.RS_LRU);
+    var data;
+    var page = new BM_PageHandle(1, data);
+    bm.initBufferPool(bp, fileName, 3, bm.ReplacementStrategy.RS_FIFO, page);
+    for (var i = 0; i < 3; i++) {
+        page.pageNum = i;
+        bm.pinPage(bp, page, i);
+        bm.markDirty(bp, page);
+        bm.unpinPage(bp, page);
+        console.log('Page, ' + page.pageNum + ', ' + page.data + ', ' + bp.dirty[page.data] + ', fixcount, ' + bp.fixcount[page.data]);
+    }
+    bm.pinPage(bp, page, 3);
 
     bm.shutdownBufferPool(bp);
 }

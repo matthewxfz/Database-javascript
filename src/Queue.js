@@ -68,6 +68,26 @@ function findPopElement(node, fixcount) {
     return null;
 }
 
+Queue.moveToHead = function(pageNum){
+    var node = head.next;
+    while(node.data != 'head'){
+        if(pageNum == node.data){
+            Queue.remove(node);
+            Queue.push(node);
+            return;
+        }
+    }
+}
+
+Queue.remove = function(node){
+    if(node.data != 'head'){
+        node.pre.next = node.next;
+        node.next.pre = node.pre;
+    }else{
+        throw new Error('cannot delete head!');
+    }
+}
+
 
 
 
