@@ -1,12 +1,14 @@
-var Queue = function (max) {
+var Queue = function (max, fixcount) {
     this.max = max;
-    this.tail = new Node('Na', null, null);
-    this.head = new Node('Na', null, null);
+    if (!(fixcount instanceof Array)) {
+        throw new TypeError('Fixcount should be an array!');
+    }
+    this.fixcount = fixcount;
+    this.head = new Node('head', null, null);
 
-    this.tail.pre = this.head;
-    this.head.next = this.tail;
+    this.head.pre = this.head;
+    this.head.next = this.head;
     this.length = 0;
-
 }
 
 function Node(data, pre, next) {
@@ -17,42 +19,42 @@ function Node(data, pre, next) {
 Queue.prototype.peek = function () {
     if (this.length == 0) return null;
     else {
-        return this.ail.data;
+        return this.head.pre.data;
     }
 }
 
 Queue.prototype.push = function (data) {
-    if (this.length == 0) {
-        this.tail.data = data;
+    if (this.length < this.max) {
+        var node = new Node(data, null, null);
+        node.pre = this.head;
+        node.next = this.head.next;
+        this.head.next.pre = node;
+        this.head.next = node;
+    
+        this.length++;
     } else {
-        if (this.length < this.max) {
-            var node = new Node(data, null, null);
-            node.next = this.head.next;
-            node.pre = this.head;
-            this.head.next.pre = node;
-            this.head.next = node;
-        } else {
-            throw new Error('Loop Queue out of boundary!');
-        }
+        console.error('Queue out of boundary! ' );
     }
-    this.length = this.length + 1;
 }
 
 Queue.prototype.pop = function () {
-    if (this.length == 0)
-        return null;
-    else {
-        var re = this.tail.data;
-        if (this.length == 1) {
-            this.tail.pre = this.head;
-            this.head.next = this.tail;
-        } else {
-            this.tail =this.tail.pre;
-            this.tail.next = 'NAA';
+    var node = findPopElement(this.head.pre, this.fixcount);
+
+    if (node == null) return null;
+    node.pre.next = node.next;
+    node.next.pre = node.pre;
+    this.length--;
+    return node.data;
+}
+
+function findPopElement(node, fixcount) {
+    while (node.data != 'head') {
+        if (fixcount[node.data] == 0) {
+            return node;
         }
-        this.length = this.length - 1;
-        return re;
+        node = node.pre;
     }
+    return null;
 }
 
 

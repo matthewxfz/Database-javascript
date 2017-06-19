@@ -72,7 +72,7 @@ BufferManager.initBufferPool = function (bp, pageFileName, numPages, strategy) {
         fd = fs.openSync(pageFileName, 'w+');
         bp.pageFile = pageFileName;
         bp.queueLength = 0;
-        
+
         bp.strategy = strategy;
         bp.numPages = numPages;
         initSpace(numPages, bp);
@@ -90,7 +90,7 @@ function initSpace(numPages, bp) {
 
     switch (bp.strategy) {
         case 0:
-            bp.queue = new Queue(numPages);
+            bp.queue = new Queue(numPages, bp.fixcount);
             break;
         case 1:
             bp.queue = new Heap();
@@ -224,19 +224,16 @@ function FIFO_pinPage(bp, page) {
         page.data = memPage;
         return;
     } else {
-        var avaFrame;
-        if (bp.numPages > bp.queue.length) {// the queue is not full
-            avaFrame = findAvalableBuffer(bp);
-        } else {// the queue is full
-            avaFrame = bp.queue.pop();
-        }
+        var avaFrame = getAvailableFrame(bp);
+
         //read from disk
         sm.safeReadBlock(bp.pageFile, bp.data, avaFrame, (err, buf) => {
             if (err) {
                 bp.storage_page_map[avaFrame] = -1;
                 dirty[avaFrame] = 0;
             }
-        })
+        });
+
         bp.storage_page_map[avaFrame] = page.pageNum;
         bp.dirty[avaFrame] = 0;
         bp.queue.push(avaFrame);
@@ -245,6 +242,25 @@ function FIFO_pinPage(bp, page) {
         page.data = avaFrame;
         return;
     }
+}
+
+/**
+ * Find avalibleFrame based on FIFO strategy
+ * 
+ * @param {any} bp 
+ * @returns 
+ */
+function getAvailableFrame_FIFO(bp) {
+    if (bp.numPages > bp.queue.length) {// the queue is not full
+        avaFrame = findAvalableBuffer(bp);
+    } else {// the queue is full
+        avaFrame = bp.queue.pop();
+    }
+    if (avaFrame == null)
+        throw new DBErrors('No page in buffer is available right now!',
+            DBErrors.type.RC_BM_NO_BUFFER_AVAILBLE);
+    else
+        return avaFrame;
 }
 
 function LRU_pinPage(bp, page) {

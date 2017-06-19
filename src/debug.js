@@ -28,12 +28,14 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
 testFIFO();
 
 function testQueue(){
-    var queue = new Queue(3);
-    queue.push(1);
+    var fixcount = [0,0,1,0];
+    var queue = new Queue(4,fixcount);
     queue.push(2);
+    queue.push(0);
     queue.push(3);
+    queue.push(1);
+
     console.log(queue.pop());
-    queue.push(4);
     console.log(queue.pop());
     console.log(queue.pop());
     queue.push(5);
