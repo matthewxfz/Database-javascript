@@ -13,7 +13,7 @@ var LoopQueue = require('./LoopQueue'),
     Heap = require('heap');
 
 const async = require('async');
-var filename = '/Users/matthewxfz/Workspaces/gits/Database-javascript/file.test',
+var filename = '/Users/matthewxfz/Workspaces/gits/Database-javascript/file2.test',
     fileName = "/Users/matthewxfz/Workspaces/tmp/write.test",
     fileName2 = "/Users/matthewxfz/Workspaces/tmp/fake.test",
     file,
@@ -25,11 +25,48 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
     this.mgmtData = mgmtData;
 }
 
-testFIFO();
 
-function testQueue(){
-    var fixcount = [0,0,1,0];
-    var queue = new Queue(4,fixcount);
+testBP();
+
+
+
+
+
+
+
+
+function testWriteStream(callback) {
+    buf = Buffer.alloc(2 * 4096).fill('a', 0, 4095);
+    buf.fill('b', 4096, 2 * 4096 - 1);
+    sm.safeWriteBlock(new File(0,filename),buf,1,0);
+    sm.safeWriteBlock(new File(0,filename),buf,0,1);
+    
+}
+
+function safeWriteBlock(file, buf, offset, callback) {
+    var opt = {
+        flags: 'w+',
+        defaultEncoding: 'utf8',
+        fd: null,
+        mode: 0o666,
+        autoClose: true,
+        start: offset
+    }
+    var writeStream = fs.createWriteStream(file.fileName, opt);
+
+    keepWrite(callback);
+    function keepWrite(callback) {
+        var ok = writeStream.write(buf, 'utf8', callback);
+        if (!ok)
+            writeStream.once('drain', keepWrite());
+    }
+}
+
+
+
+function testQueue() {
+    var fixcount = [0, 0, 1, 0];
+    var queue = new Queue(4, fixcount);
     queue.push(2);
     queue.push(0);
     queue.push(3);
@@ -40,8 +77,9 @@ function testQueue(){
     console.log(queue.pop());
     queue.push(5);
     console.log(queue.pop());
-    
+
 }
+
 
 function testFIFO() {
     var file = new File();
@@ -50,14 +88,12 @@ function testFIFO() {
     var data;
     var page = new BM_PageHandle(1, data);
     bm.initBufferPool(bp, fileName, 3, bm.ReplacementStrategy.RS_FIFO, page);
-    for (var i = 0; i < 22; i++) {
+    for (var i = 0; i < 5; i++) {
         page.pageNum = i;
         bm.pinPage(bp, page, i);
-        console.log('Page, ' + page.pageNum + ', ' + page.data);
         bm.markDirty(bp, page);
         bm.unpinPage(bp, page);
-
-        console.log(bp.data.toString());
+        console.log('Page, ' + page.pageNum + ', ' + page.data + ', ' + bp.dirty[page.data] + ', fixcount, ' + bp.fixcount[page.data]);
     }
 
     bm.shutdownBufferPool(bp);
@@ -97,7 +133,7 @@ function testBP() {
     var bp = new BM_BufferPool(fileName, 1, bm.ReplacementStrategy.RS_FIFO);
     var data;
     var page = new BM_PageHandle(1, data);
-    bm.initBufferPool(bp, fileName, 3, bm.ReplacementStrategy.RS_FIFO, page);
+    bm.initBufferPool(bp, filename, 3, bm.ReplacementStrategy.RS_FIFO, page);
 
     bp.dirty[0] = 1;
     bp.dirty[1] = 1;
@@ -110,17 +146,15 @@ function testBP() {
     bp.pageFile = filename;
 
     page.pageNum = 0;
-    page.data.write("1st floor", sm.PAGE_SIZE * page.pageNum, sm.PAGE_SIZE * (page.pageNum + 1));
+    bp.data.write("1st floor", sm.PAGE_SIZE * page.pageNum, sm.PAGE_SIZE * (page.pageNum + 1));
     bm.forcePage(bp, page)
 
     page.pageNum = 1;
-    page.data.write("2nd floor", sm.PAGE_SIZE * page.pageNum, sm.PAGE_SIZE * (page.pageNum + 1));
+    bp.data.write("2nd floor", sm.PAGE_SIZE * page.pageNum, sm.PAGE_SIZE * (page.pageNum + 1));
     bm.forcePage(bp, page);
 
     page.pageNum = 2;
-    // page.data = (Buffer.alloc(sm.PAGE_SIZE));
-    // page.data.write('222222222222', 0);
-    page.data.write("3rd floor", sm.PAGE_SIZE * page.pageNum, sm.PAGE_SIZE * (page.pageNum + 1));
+    bp.data.write("3rd floor", sm.PAGE_SIZE * page.pageNum, sm.PAGE_SIZE * (page.pageNum + 1));
     bm.forcePage(bp, page);
 }
 

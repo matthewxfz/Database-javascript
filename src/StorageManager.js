@@ -126,27 +126,27 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
  * @param {any} offset 
  * @param {any} callback 
  */
-StorageManaer.safeReadBlock = function(filename,buffer,offset,callback){
-     const opt = {
+StorageManaer.safeReadBlock = function (filename, buffer, offset, callback) {
+    const opt = {
         flags: 'r',
         encoding: 'utf8',
         fd: null,
         mode: 0o666,
         autoClose: true,
-        start:offset,
-        end:offset+PAGE_SIZE
+        start: offset,
+        end: offset + PAGE_SIZE
     };
     var readStream = fs.createReadStream(filename, opt);
-    readStream.on('data',(chunk)=>{
-            buffer.write(chunk,offset,'utf8');
-            offset +=chunk.length;
+    readStream.on('data', (chunk) => {
+        buffer.write(chunk, offset, 'utf8');
+        offset += chunk.length;
     });
-    readStream.on('end',()=>{
-        callback(null,buffer);
+    readStream.on('end', () => {
+        callback(null, buffer);
     });
 
-    readStream.on('error',(err)=>{
-        callback(err,null);
+    readStream.on('error', (err) => {
+        callback(err, null);
     });
 }
 
@@ -258,6 +258,34 @@ StorageManaer.writeBlock = function (pageNum, file, memPage, callback) {
 
 }
 
+/**
+ * This is used for safe write one block of data, you should use this function in multiple writting situation 
+ * 
+ * @param {any} file 
+ * @param {any} buf 
+ * @param {any} offset --page in buffer
+ * @param {any} position --page in file
+ * @param {any} callback 
+ */
+StorageManaer.safeWriteBlock = function(filename, buf, offset, position, callback) {
+    var opt = {
+        flags: 'w+',
+        defaultEncoding: 'utf8',
+        fd: null,
+        mode: 0o666,
+        autoClose: true,
+        start: position*PAGE_SIZE
+    }
+    var writeStream = fs.createWriteStream(filename, opt);
+
+    keepWrite(callback);
+    function keepWrite(callback) {
+        var ok = writeStream.write(buf.slice(offset*PAGE_SIZE, (offset+1)*PAGE_SIZE), 'utf8', callback);
+        if (!ok)
+            writeStream.once('drain', keepWrite());
+    }
+}
+
 
 /**
  * Write Block once asyncly, not recommanded write multiple times, should use writeStream instead!
@@ -274,7 +302,7 @@ StorageManaer.writeBlockWithOffset = function (pageNum, file, memPage, offset, c
         callback(new DBErrors('Out of max pags number', DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY), null, file)
     } else {
         fs.write(file.fd, memPage, offset * PAGE_SIZE, PAGE_SIZE, PAGE_SIZE * pageNum, function (err, bytesWritten, buffer) {
-            if(err) throw err;
+            if (err) throw err;
             callback(err, buffer, file);
         });
     }
@@ -299,8 +327,8 @@ StorageManaer.writeCurrentBlock = function (file, memPage, callback) {
  * @param {Buffer} memPage 
  * @param {int} offset
  */
-StorageManaer.writeCurrentBlockWithOffset = function (file, memPage,offset, callback) {
-    StorageManaer.writeBlockWithOffset(file.curPagePos, file, memPage,offset, callback);
+StorageManaer.writeCurrentBlockWithOffset = function (file, memPage, offset, callback) {
+    StorageManaer.writeBlockWithOffset(file.curPagePos, file, memPage, offset, callback);
 }
 
 /**

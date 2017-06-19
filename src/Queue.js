@@ -47,6 +47,17 @@ Queue.prototype.pop = function () {
     return node.data;
 }
 
+Queue.prototype.toString = function(){
+    var node = head.next;
+    var result = '';
+    if(node == null) result = null;
+    while(node.data != 'head'){
+        result += node.data + ', '
+    }
+    
+    return result;
+}
+
 function findPopElement(node, fixcount) {
     while (node.data != 'head') {
         if (fixcount[node.data] == 0) {
