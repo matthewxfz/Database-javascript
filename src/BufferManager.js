@@ -6,7 +6,8 @@ const DBErrors = require('./DBErrors'),
     BufferManager = {},
     fs = require('fs'),
     assert = require('assert'),
-    sm = require('./StorageManager');
+    sm = require('./StorageManager'),
+    EventEmitter = require('events');;
 
 var ReplacementStrategy = {
     RS_FIFO: 0,
@@ -19,58 +20,35 @@ var ReplacementStrategy = {
     CODING = sm.CODING,
     Heap = require('heap'),
     LoopQueue = require('./LoopQueue'),
-    File = require('./File');
+    Queue = require('./Queue'),
+    File = require('./File'),
+    BM_BufferPool = require('./BM_BufferPool');
 
-/**
- * Element of the pageData array, describe extral information of page.
- * 
- * @param {any} storagePage 
- * @param {any} dirty 
- * @param {any} fixcount 
- */
-var pageInfo = function (storagePage, dirty, fixcount) {
-    var storge_page;
-    var dirty;
-    var fixcount;
-}
+class MyEmitter extends EventEmitter { };
+var bmEmitter = new MyEmitter();
+bmEmitter.on('forceFlushFinished', function (err, bp, file) {
+    console.log('forceFlushFinished Event');
+    if (isAllZero(bp.dirty)) {
+        sm.closePageFile(file, function (err) {
+            if (err) throw err;
+            else console.log('file closed');
+        });
+    }
+})
+
 /**
  *The BM_PageHandle stores information about a page. 
  *The page number (position of the page in the page file) is stored in pageNum. 
  *The page number of the first data page in a page file is 0. The data field points to the area in memory storing the content of the page. This will usually be a page frame from your buffer pool.
  * 
  * @param {any} pageNum 
- * @param {Buffer} data
+ * @param {Buffer} data - the return data, or input data, not the real data
  */
 function BM_PageHandle(pageNum, data) {
     this.pageNum = pageNum;
     this.data = data;
 }
 
-/**
- * tores information about a buffer pool: 
- * the name of the page file associated with the buffer pool (pageFile), 
- * the size of the buffer pool, i.e., the number of page frames (numPages), 
- * the page replacement strategy (strategy), and a pointer to bookkeeping data (mgmtData). 
- * mgmData is an array that use the first one byte of   
- * 
- * @param {string} pageFile 
- * @param {int} numPages 
- * @param {ReplacementStrategy} strategy 
- * @param {Array[]} storage_page_map
- * @param {Array[]} dirty
- * @param {Array[]} fixcount
- *  
- */
-function BM_BufferPool(pageFile, numPages, strategy, storage_page_map, dirty, fixcount) {
-    this.pageFile = page;
-    this.numPages = numPages;
-    this.strategy = strategy;
-    this.storage_page_map = storage_page_map;
-    this.dirty = dirty;
-    this.fixcount = fixcount;
-    this.readBlocksNum = 0;
-    this.writeBlockNum = 0;
-}
 
 BM_BufferPool.toString = function () {
     return 'hello ' + pageFile + ', ' + numPages + ', ' + strategy + ', ' + storage_page_map.toString() + ', ' + dirty.toString() + ', ' + fixcount.toString();
@@ -87,47 +65,42 @@ BM_BufferPool.toString = function () {
  * @param {char} pageFileName path to the file
  * @param {int} numPages 
  * @param {ReplacementStrategy} strategy 
- * @param {any} stratData 
  */
-BufferManager.initBufferPool = function (bp, pageFileName, numPages, strategy, page) {
+BufferManager.initBufferPool = function (bp, pageFileName, numPages, strategy) {
     var fd;
     try {
         fd = fs.openSync(pageFileName, 'w+');
         bp.pageFile = pageFileName;
-        switch (bp.strategy) {
-            case 0:
-                bp.queue = new Array(numPages);
-                break;
-            case 1:
-                bp.heap = new Heap();
-                break;
-            case 2:
-                bp.loopQueue = new LoopQueue(numPages);
-                break;
-            default:
-        }
         bp.queueLength = 0;
-        if (strategy < 0 || strategy > 3) {
-            throw new DBErrors('No such strategy!', DBErrors.type.RC_RM_UNKOWN_DATATYPE);
-        } else {
-            bp.strategy = strategy;
-            try {
-                bp.numPages = numPages;
-                initSpace(numPages, page, bp);
-            } catch (error) {
-                throw error;
-            }
-        }
+        
+        bp.strategy = strategy;
+        bp.numPages = numPages;
+        initSpace(numPages, bp);
+
     } catch (error) {
         throw error;
     }
 }
 
-function initSpace(numPages, page, bp) {
-    page.data = Buffer.alloc(sm.PAGE_SIZE * numPages);
+function initSpace(numPages, bp) {
+    bp.data = Buffer.alloc(sm.PAGE_SIZE * numPages);
     bp.storage_page_map = new Array(numPages);
     bp.fixcount = new Array(numPages);
     bp.dirty = new Array(numPages);
+
+    switch (bp.strategy) {
+        case 0:
+            bp.queue = new Queue(numPages);
+            break;
+        case 1:
+            bp.queue = new Heap();
+            break;
+        case 2:
+            bp.queue = new LoopQueue(numPages);
+            break;
+        default:
+            throw new DBErrors('No such strategy!', DBErrors.type.RC_RM_UNKOWN_DATATYPE);
+    }
 }
 
 /**
@@ -141,19 +114,20 @@ function initSpace(numPages, page, bp) {
  * @param {any} callback 
  */
 BufferManager.shutdownBufferPool = function (bp) {
-    if (bp.mgmtData = undefined)
+    if (bp.data = undefined)
         throw new DBErrors('Buffer pool Not defined!');
     else
         //check if there is pin page
-        for (var i = 0; i < bp.fixcount.length; i++) {
-            if (bo.fixcount[i] != 0) {
-                throw DBErrors('Still one page is pinned!');
+        if (bp.strategy == ReplacementStrategy.RS_LRU)
+            for (var i = 0; i < bp.fixcount.length; i++) {
+                if (bp.fixcount[i] != 0) {
+                    throw new DBErrors('Still pages are pinned!');
+                }
             }
-        }
     //Objects (including Buffers) are tracked by the garbage collector and deallocated when there are no more references to it
 
     //WRITE DIRTYR PAGE BACK TO THE DISK
-    forceFlushPool(bp);
+    BufferManager.forceFlushPool(bp);
 }
 
 /**
@@ -162,26 +136,33 @@ BufferManager.shutdownBufferPool = function (bp) {
  * @param {any} bp 
  */
 BufferManager.forceFlushPool = function (bp) {
-    sm.openPageFile(bp.pageFile, file, function (err, file) {
-        for (file.curPagePos = 0; file.curPagePos < bp.numPages; file.curPagePos++) {
-            if (bp.dirty[file.curPagePos] == 0) {
-                sm.writeCurrentBlock(file, pagelist.current.page.data, function (err) {
+    sm.openPageFile(bp.pageFile, new File(), function (err, file) {
+        if (err) throw err;
+        for (var memPageNum = 0; memPageNum < bp.numPages; memPageNum++) {
+            if (bp.dirty[memPageNum] == 1) {
+                sm.ensureCapacity(3, file, function (err, file) {
+                    //buf = Buffer.alloc(sm.PAGE_SIZE, '.', sm.COING);
                     if (err) throw err
-                    else
-                        bp.dirty[file.curPagePos] = 0;
+                    var curPos = bp.storage_page_map[memPageNum];
+                    var tmpNum = memPageNum;
+                    sm.writeBlockWithOffset(curPos, file, bp.data, tmpNum, function (err) {
+                        if (err) throw err
+                        else {
+                            bp.dirty[tmpNum] = 0;
+                            bmEmitter.emit('forceFlushFinished', null, bp, file);
+                        }
+
+                    });
                 });
             }
         }
-        while (isAllZero(bp.dirty)) { }; //wait for all the work
-        sm.closePageFile(file, function (err) {
-            if (err) throw err;
-        });//async close
+
     });
 }
 
 function isAllZero(array) {
     var result = 0;
-    for (var i = 0; i < array; i++) {
+    for (var i = 0; i < array.length; i++) {
         result = result | array[i];
         if (result > 0)
             return false;
@@ -219,16 +200,16 @@ BufferManager.unpinPage = function (bp, page) {
  * @param {any} bp 
  * @param {BM_PageHandle} page - page in the file
  */
-BufferManager.pinPage = function (bp, page) {
+BufferManager.pinPage = function (bp, page, pageNum) {
     switch (bp.strategy) {
         case 0:
-            FIFO_pinPage();
+            FIFO_pinPage(bp, page);
             break;
         case 1:
-            LRU_pinPage();
+            LRU_pinPage(bp, page);
             break;
         case 2:
-            CLOCK_pinPage();
+            CLOCK_pinPage(bp, page);
             break;
         default:
     }
@@ -238,23 +219,31 @@ function FIFO_pinPage(bp, page) {
     if (bp.queue == undefined) {
         throw Error('The FIFO queue is not defined!');
     }
-    if (findMemPageId(page.pageNum)) {//if the page is in the buffer
-        fixcount[page.pageNum]++;
+    var memPage = findMemPageId(page.pageNum);
+    if (memPage !== null) {//if the page is in the buffer
+        page.data = memPage;
+        return;
     } else {
-        if (page.pageNum > bp.queueLength) {// the queue is not full
-            var avaFrame = findAvalableBuffer(bp);
-
-            forcePage(bp, page);
-            bp.storage_page_map[avaFrame] = page.pageNum;
-            dirty[avaFrame] = 0;
-            bp.queue.push(avaFrame);
-            bp.queueLength++;
-        } else {
-            var memPage = bp.queue.pop();
-            forcePage(bp, page);
-            bp.storage_page_map[memPage] = page.pageNum;
-            bp.queueLength--;
+        var avaFrame;
+        if (bp.numPages > bp.queue.length) {// the queue is not full
+            avaFrame = findAvalableBuffer(bp);
+        } else {// the queue is full
+            avaFrame = bp.queue.pop();
         }
+        //read from disk
+        sm.safeReadBlock(bp.pageFile, bp.data, avaFrame, (err, buf) => {
+            if (err) {
+                bp.storage_page_map[avaFrame] = -1;
+                dirty[avaFrame] = 0;
+            }
+        })
+        bp.storage_page_map[avaFrame] = page.pageNum;
+        bp.dirty[avaFrame] = 0;
+        bp.queue.push(avaFrame);
+        bp.queueLength++;
+
+        page.data = avaFrame;
+        return;
     }
 }
 
@@ -308,7 +297,7 @@ function CLOCK_pinPage(bp, page) {
 
 function findAvalableBuffer(bp) {
     for (var i = 0; i < bp.numPages; i++) {
-        if (bp.storage_page_map[i] != undefined) {
+        if (bp.storage_page_map[i] == undefined) {
             return i;
         }
     }
@@ -341,7 +330,7 @@ BufferManager.forcePage = function (bp, page) {
     var memPageNum = findMemPageId(bp, page.pageNum);
     if (memPageNum !== null) {
         if (bp.dirty[memPageNum] == 1) {
-            writeOneBlockForOnce(bp.pageFile,page.pageNum, page.data, memPageNum);
+            writeOneBlockForOnce(bp.pageFile, page.pageNum, bp.data, memPageNum);
         } else {
             throw new DBErrors('Writting page is not dirty!');
         }
@@ -354,7 +343,7 @@ function writeOneBlockForOnce(filename, pageNum, buf, offset) {
     sm.openPageFile(filename, new File, function (err, file) {
         sm.ensureCapacity(3, file, function (err, file) {
             //buf = Buffer.alloc(sm.PAGE_SIZE, '.', sm.COING);
-            sm.writeBlockWithOffset(pageNum, file, buf,offset, function (err, buf) {
+            sm.writeBlockWithOffset(pageNum, file, buf, offset, function (err, buf) {
                 if (err) console.error(err)
                 sm.closePageFile(file, function () {
                     if (err) throw err;
@@ -413,6 +402,8 @@ BufferManager.getNumReadIO = function (bp) {
 BufferManager.getNumWriteIO = function (bp) {
     return bp.writeBlockNum;
 }
+
+
 
 BufferManager.ReplacementStrategy = ReplacementStrategy;
 
