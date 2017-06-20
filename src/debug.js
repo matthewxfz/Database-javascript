@@ -4,7 +4,8 @@ var sm = require('./StorageManager')
     , File = require('./File')
     , util = require('./util'),
     assert = require('assert'),
-    Queue = require('./Queue');
+    Queue = require('./Queue'),
+    TestHelper = require('../test/TestHelper');
 
 var bm = require('./BufferManager');
 var BM_PageHandle = require('./BufferManagerHelper');
@@ -26,8 +27,124 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
 }
 
 
-testLRU();
+testHelper();
 
+
+
+
+function testFIFO2(){
+
+    const poolContents= [ 
+    "[0 0],[-1 0],[-1 0]" , 
+    "[0 0],[1 0],[-1 0]", 
+    "[0 0],[1 0],[2 0]", 
+    "[3 0],[1 0],[2 0]", 
+    "[3 0],[4 0],[2 0]",
+    "[3 0],[4 1],[2 0]",
+    "[3 0],[4 1],[5x0]",
+    "[6x0],[4 1],[5x0]",
+    "[6x0],[4 1],[0x0]",
+    "[6x0],[4 0],[0x0]",
+    "[6 0],[4 0],[0 0]"
+  ];
+  const  requests = [0,1,2,3,4,4,5,6,0];
+  const  numLinRequests = 5;
+  const  numChangeRequests = 3;
+
+  var helper = new TestHelper();
+
+    var file = new File();
+
+    var bp = new BM_BufferPool(filename, 1, bm.ReplacementStrategy.RS_FIFO);
+    var data;
+    var page = new BM_PageHandle(1, data);
+    bm.initBufferPool(bp, filename, 3, bm.ReplacementStrategy.RS_FIFO, page);
+
+
+  // reading some pages linearly with direct unpin and no modifications
+  for(var i = 0; i < numLinRequests; i++)
+    {
+      page.pageNum = i;
+      bm.pinPage(bp,page);
+      bm.unpinPage(bp,page);
+      
+      assert.equal(true,bmTestHelper(bp,poolContents[i]));
+    }
+
+
+}
+
+
+function testHelper(){
+    var bp = new BM_BufferPool(filename, 1, bm.ReplacementStrategy.RS_FIFO);
+    bp.fixcount = [0, 0 ,0];
+    bp.storage_page_map = [0, -1, -1];
+    bp.dirty = [0, 0 ,0];
+
+    assert(true,bmTestHelper(bp,"[0 0],[-1 0],[-1 0]" ));
+}
+/**
+     * Return if the intput data fits the expect result?
+     * 
+     * @param {BM_BufferPool} bp -- buffer pool
+     * @param {string} [str=[i]]  --expect result in a moment i
+     */
+    function bmTestHelper(bp, str){
+        var array = str.split(',');
+        for(var key in array){
+            var subarray = array[key].split('');
+            if(!(bp.storage_page_map[key] == subarray[1] 
+            && bp.dirty[key] == subarray[2] 
+            && bp.fixcount[key] == subarray[3])){
+               return false;
+            }
+        }
+        return true;
+    }
+
+
+// /**
+//      * Return if the intput data fits the expect result?
+//      * 
+//      * @param {BM_BufferPool} bp -- buffer pool
+//      * @param {string} [str=[i]]  --expect result in a moment i
+//      */
+// function bmTestHelper(bp, str){
+//     var count = 0;
+//     var array = str.split(',');
+//     for (var i = 0;i<array.length;i++) {
+//         var val = {};
+//         var p = 0;
+//         var subarray = array[i].split('');
+//         if(subarray[1] == '-'){
+//             val[0] = '-'+subarray[2];
+//             p=3;
+//         }else{
+//             val[0] = subarray[1];
+//             p=2;
+//         }
+//         if(subarray[p] == ' ') val[1] = 0;
+//         else val[1] = 1;
+
+//         if(subarray[p+1] == '-'){
+//             val[2] = '-'+subarray[p+2];
+//         }else{
+//             val[2] = subarray[p];
+//         }
+        
+//         if (bp.storage_page_map[i] == val[0]
+//             && bp.dirty[i] == val[1]
+//             && bp.fixcount[i] == val[2]) {
+//             count++;
+//         }else{
+//              return false;
+//         }
+//     }
+//     return true;
+//     // if (count == bp.numPages)
+//     //     return true;
+//     // return false;
+// }
 
 
 

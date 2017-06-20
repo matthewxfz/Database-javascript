@@ -81,9 +81,9 @@ BufferManager.initBufferPool = function (bp, pageFileName, numPages, strategy) {
 
 function initSpace(numPages, bp) {
     bp.data = Buffer.alloc(sm.PAGE_SIZE * numPages);
-    bp.storage_page_map = new Array(numPages);
+    bp.storage_page_map = new Array(numPages).fill(-1);
     bp.fixcount = new Array(numPages).fill(0);
-    bp.dirty = new Array(numPages);
+    bp.dirty = new Array(numPages).fill(0);
 
     switch (bp.strategy) {
         case 0:
@@ -286,7 +286,7 @@ function getAvailableFrame_FIFO(bp) {
 
 function findAvalableBuffer(bp) {
     for (var i = 0; i < bp.numPages; i++) {
-        if (bp.storage_page_map[i] == undefined) {
+        if (bp.storage_page_map[i] == -1) {
             return i;
         }
     }
