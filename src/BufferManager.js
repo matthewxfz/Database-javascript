@@ -114,12 +114,15 @@ BufferManager.shutdownBufferPool = function (bp) {
     if (bp.data == undefined)
         throw new DBErrors('Buffer pool Not defined!');
     else
-        //check if there is pin page
-        for (var i = 0; i < bp.fixcount.length; i++) {
-            if (bp.fixcount[i] != 0) {
-                throw new DBErrors('Still pages are pinned!');
-            }
+        console.log('before check' + JSON.parse(JSON.stringify(bp.fixcount)))
+    //check if there is pin page
+    for (var i = 0; i < bp.fixcount.length; i++) {
+        //console.log('count, ' + bp.fixcount[i] + ', k' + i);
+        if (bp.fixcount[i] != 0) {
+            console.log('surprise, ' + bp.fixcount[i] + ', k' + i);
+            throw new DBErrors('Still pages are pinned!');
         }
+    }
     //Objects (including Buffers) are tracked by the garbage collector and deallocated when there are no more references to it
 
     //WRITE DIRTYR PAGE BACK TO THE DISK
@@ -208,23 +211,40 @@ function FIFO_pinPage(bp, page) {
         throw Error('The FIFO queue is not defined!');
     }
     var memPage = findMemPageId(bp, page.pageNum);
-    if (memPage !== null) {//if the page is in the buffer
+    if (memPage !== null) {
         page.data = memPage;
-    } else {
-        page.data = getAvailableFrame_FIFO(bp);
+    } else {//the file page is not in the buffer
+        page.data = getAvailableFrame_FIFO(bp);// find a page to replace
         if (page.data == null)
             throw new DBErrors('No page in buffer is available right now!',
                 DBErrors.type.RC_BM_NO_BUFFER_AVAILBLE);
         else {
+            if (bp.dirty[page.data] == 1) {
+                BufferManager.forcePage(bp, page, () => {
+                    sm.safeReadBlock(bp.pageFile, bp.data, page.data, page.pageNum, (err, buf) => {
+                        if(err){
+                            bp.fixcount[page.data]--;
+                            throw err;
+                        }
+                    });
+                    bp.dirty[page.data] == 0;
+                    bp.fixcount[page.data]++;
+                });
+
+            } else {
+                sm.safeReadBlock(bp.pageFile, bp.data, page.data, page.pageNum, (err, buf) => {
+                    if(err){
+                            bp.fixcount[page.data]--;
+                            throw err;
+                        }
+                    //console.log('pin data'+bp.data.toString('utf8'));
+                });
+                 bp.fixcount[page.data]++;
+            }
+
             bp.storage_page_map[page.data] = page.pageNum;
-            bp.fixcount[page.data]++;
             bp.queue.push(page.data);
         }
-
-    }
-    if (bp.dirty[page.data] == 1) {
-        BufferManager.forcePage(bp, page);
-        bp.dirty[page.data] == 0;
     }
 }
 
@@ -247,7 +267,7 @@ function LRU_pinPage(bp, page) {
  * @param {any} page 
  */
 function CLOCK_pinPage(bp, page) {
-   if (bp.queue == undefined) {
+    if (bp.queue == undefined) {
         throw Error('The FIFO queue is not defined!');
     }
     var memPage = findMemPageId(bp, page.pageNum);
@@ -268,9 +288,9 @@ function CLOCK_pinPage(bp, page) {
         bp.dirty[page.data] == 0;
     }
 }
-function updateBufferPoolWhenPageNotDirty_FIFO(bp, avaFrame, page) {
+function updateBufferPoolWhenPageNotDirty_FIFO(bp, page) {
     //read from disk
-    sm.safeReadBlock(bp.pageFile, bp.data, avaFrame, (err, buf) => {
+    sm.safeReadBlock(bp.pageFile, bp.data, page.data, paeg.numPages, (err, buf) => {
         if (err) {
             bp.storage_page_map[avaFrame] = -1;
             bp.fixcount[avaFrame] = 0;
@@ -377,21 +397,23 @@ function findMemPageId(bp, pageNum) {
  * forcePage should write the current content of the page back to the page file on disk.
  * 
  * @param {any} bp 
- * @param {any} page 
+ * @param {any} page write page.numPage in file  to page.data in buffer
  */
 BufferManager.forcePage = function (bp, page, callback) {
-    if (bp.storage_page_map[page.pageNum] != page.data)
-        page.data = findMemPageId(bp, page.pageNum);
-
-    if (page.data !== null) {
-        if (bp.dirty[page.data] == 1) {
+    if (page.data == undefined || page.pageNum == undefined) {
+        var err = new DBErrors('Cannot force page since page is not well defined!');
+        if (callback) callback(err, bp);
+        throw err;
+    } else {
+        if (page.data < bp.numPages) {
             sm.safeWriteBlock(bp.pageFile, bp.data, page.data, page.pageNum, callback);
         } else {
-            throw new DBErrors('Writting page is not dirty!');
+            var err = new DBErrors('Cannot force page since page in buffer is out of boundary!');
+            if (callback) callback(err, bp);
+            throw err;
         }
-    } else {
-        throw new DBErrors('Writting page is not in the buffer pool');
     }
+
 }
 
 /**

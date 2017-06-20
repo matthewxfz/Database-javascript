@@ -118,35 +118,58 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
     }
 }
 
+// StorageManaer.readBlockSync = function (pageNum, file, memPage, callback) {
+//     if (file.curPagePos < 0 || file.curPagePos >= file.totalPageNumber) {
+//         callback(new DBErrors("Current page number is not valid", DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY));
+//     } else {
+//         fs.read(file.fd, memPage, 0, PAGE_SIZE, pageNum * PAGE_SIZE, function (err, bytesRead, buffer) {
+//             if (err) {
+//                 err = DBErrors('Operation not permited', DBErrors.type.RC_READ_FAILED);
+//             }
+//             callback(err, buffer);
+//         });
+//     }
+// }
+
+
+
+
+
 /**
- * Safely read block multiple time using stream
+ * Safely read one block multiple time using stream
  * 
- * @param {any} filename 
- * @param {any} buffer 
- * @param {any} offset 
+ * @param {any} filename --file path
+ * @param {any} buffer --written file
+ * @param {any} offset --start page in the buffer
+ * @param {any} position --start page in the file
+ * 
  * @param {any} callback 
  */
-StorageManaer.safeReadBlock = function (filename, buffer, offset, callback) {
+StorageManaer.safeReadBlock = function (filename, buf, offset, position, callback){
     const opt = {
         flags: 'r',
         encoding: 'utf8',
         fd: null,
         mode: 0o666,
         autoClose: true,
-        start: offset,
-        end: offset + PAGE_SIZE
+        start: position*PAGE_SIZE,
+        end: position*PAGE_SIZE + PAGE_SIZE
     };
     var readStream = fs.createReadStream(filename, opt);
+    //readStream.resume();
     readStream.on('data', (chunk) => {
-        buffer.write(chunk, offset, 'utf8');
+        //console.log('data'+chunk);
+        buf.write(chunk, offset, 'utf8');
+        //console.log('buf'+buf);
         offset += chunk.length;
     });
     readStream.on('end', () => {
-        callback(null, buffer);
+        // console.log('end');
+        if(callback) callback(null, buf);
     });
 
     readStream.on('error', (err) => {
-        callback(err, null);
+       if(callback) callback(err, buf);
     });
 }
 

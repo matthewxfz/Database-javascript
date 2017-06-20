@@ -14,7 +14,7 @@ var Clock = require('./Clock'),
     Heap = require('heap');
 
 const async = require('async');
-var filename = '/Users/matthewxfz/Workspaces/gits/Database-javascript/file2.test',
+var filename = '/Users/matthewxfz/Workspaces/gits/Database-javascript/file.test',
     fileName = "/Users/matthewxfz/Workspaces/tmp/write.test",
     fileName2 = "/Users/matthewxfz/Workspaces/tmp/fake.test",
     file,
@@ -25,38 +25,63 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
     this.strategy = strategy;
     this.mgmtData = mgmtData;
 }
-testClock();
+testFIFO(20);
 
 
+function testReadFromEmptyFileandCompare(num) {
+    var expect = Buffer.alloc(sm.PAGE_SIZE);
+    for(var i = 0;i<num;i++){
+        sm.safeWriteBlock(filename, Buffer.alloc(sm.PAGE_SIZE, i, 'utf8'), 0, i);
+    }
+    
+    //console.log('ori, ' + expect.toString('utf8'))
+    //sm.safeReadBlock(filename, expect, 0, 0, (err) => {
 
-function testClock(){
-    var fixcount = [0,0,1,0,0];
-    var clock  = new Clock(5,fixcount);
+    var bp = new BM_BufferPool(filename, 1, bm.ReplacementStrategy.RS_FIFO);
+    var page = new BM_PageHandle(0, 0);
+    bm.initBufferPool(bp, filename, 3, bm.ReplacementStrategy.RS_FIFO, page);
 
-    for(var i=0;i<20;i++){
+    //console.log(expect);
+
+    for (var i = 0; i < num; i++) {
+        page.pageNum = i;
+        bm.pinPage(bp, page);
+        sm.safeReadBlock(filename, expect, page.data, page.pageNum);
+        bm.unpinPage(bp, page);
+        var corBuf = bp.data.slice(page.data*sm.PAGE_SIZE,(page.data+1)*sm.PAGE_SIZE);
+        console.log(corBuf.compare(expect));
+    }
+    //});
+}
+
+function testClock() {
+    var fixcount = [0, 0, 1, 0, 0];
+    var clock = new Clock(5, fixcount);
+
+    for (var i = 0; i < 20; i++) {
         console.log(clock.pop());
     }
 }
-function testFIFO2(){
+function testFIFO2() {
 
-    const poolContents= [ 
-    "[0 0],[-1 0],[-1 0]" , 
-    "[0 0],[1 0],[-1 0]", 
-    "[0 0],[1 0],[2 0]", 
-    "[3 0],[1 0],[2 0]", 
-    "[3 0],[4 0],[2 0]",
-    "[3 0],[4 1],[2 0]",
-    "[3 0],[4 1],[5x0]",
-    "[6x0],[4 1],[5x0]",
-    "[6x0],[4 1],[0x0]",
-    "[6x0],[4 0],[0x0]",
-    "[6 0],[4 0],[0 0]"
-  ];
-  const  requests = [0,1,2,3,4,4,5,6,0];
-  const  numLinRequests = 5;
-  const  numChangeRequests = 3;
+    const poolContents = [
+        "[0 0],[-1 0],[-1 0]",
+        "[0 0],[1 0],[-1 0]",
+        "[0 0],[1 0],[2 0]",
+        "[3 0],[1 0],[2 0]",
+        "[3 0],[4 0],[2 0]",
+        "[3 0],[4 1],[2 0]",
+        "[3 0],[4 1],[5x0]",
+        "[6x0],[4 1],[5x0]",
+        "[6x0],[4 1],[0x0]",
+        "[6x0],[4 0],[0x0]",
+        "[6 0],[4 0],[0 0]"
+    ];
+    const requests = [0, 1, 2, 3, 4, 4, 5, 6, 0];
+    const numLinRequests = 5;
+    const numChangeRequests = 3;
 
-  var helper = new TestHelper();
+    var helper = new TestHelper();
 
     var file = new File();
 
@@ -66,27 +91,26 @@ function testFIFO2(){
     bm.initBufferPool(bp, filename, 3, bm.ReplacementStrategy.RS_FIFO, page);
 
 
-  // reading some pages linearly with direct unpin and no modifications
-  for(var i = 0; i < numLinRequests; i++)
-    {
-      page.pageNum = i;
-      bm.pinPage(bp,page);
-      bm.unpinPage(bp,page);
-      
-      assert.equal(true,bmTestHelper(bp,poolContents[i]));
+    // reading some pages linearly with direct unpin and no modifications
+    for (var i = 0; i < numLinRequests; i++) {
+        page.pageNum = i;
+        bm.pinPage(bp, page);
+        bm.unpinPage(bp, page);
+
+        assert.equal(true, bmTestHelper(bp, poolContents[i]));
     }
 
 
 }
 
 
-function testHelper(){
+function testHelper() {
     var bp = new BM_BufferPool(filename, 1, bm.ReplacementStrategy.RS_FIFO);
-    bp.fixcount = [0, 0 ,0];
+    bp.fixcount = [0, 0, 0];
     bp.storage_page_map = [0, -1, -1];
-    bp.dirty = [0, 0 ,0];
+    bp.dirty = [0, 0, 0];
 
-    assert(true,bmTestHelper(bp,"[0 0],[-1 0],[-1 0]" ));
+    assert(true, bmTestHelper(bp, "[0 0],[-1 0],[-1 0]"));
 }
 
 /**
@@ -95,41 +119,38 @@ function testHelper(){
      * @param {BM_BufferPool} bp -- buffer pool
      * @param {string} [str=[i]]  --expect result in a moment i
      */
-function bmTestHelper(bp, str){
+function bmTestHelper(bp, str) {
     var count = 0;
     var array = str.split(',');
-    for (var i = 0;i<array.length;i++) {
+    for (var i = 0; i < array.length; i++) {
         var val = {};
         var p = 0;
         var subarray = array[i].split('');
-        if(subarray[1] == '-'){
-            val[0] = '-'+subarray[2];
-            p=3;
-        }else{
+        if (subarray[1] == '-') {
+            val[0] = '-' + subarray[2];
+            p = 3;
+        } else {
             val[0] = subarray[1];
-            p=2;
+            p = 2;
         }
-        if(subarray[p] == ' ') val[1] = 0;
+        if (subarray[p] == ' ') val[1] = 0;
         else val[1] = 1;
 
-        if(subarray[p+1] == '-'){
-            val[2] = '-'+subarray[p+2];
-        }else{
+        if (subarray[p + 1] == '-') {
+            val[2] = '-' + subarray[p + 2];
+        } else {
             val[2] = subarray[p];
         }
-        
+
         if (bp.storage_page_map[i] == val[0]
             && bp.dirty[i] == val[1]
             && bp.fixcount[i] == val[2]) {
             count++;
-        }else{
-             return false;
+        } else {
+            return false;
         }
     }
     return true;
-    // if (count == bp.numPages)
-    //     return true;
-    // return false;
 }
 
 
@@ -141,9 +162,9 @@ function bmTestHelper(bp, str){
 function testWriteStream(callback) {
     buf = Buffer.alloc(2 * 4096).fill('a', 0, 4095);
     buf.fill('b', 4096, 2 * 4096 - 1);
-    sm.safeWriteBlock(new File(0,filename),buf,1,0);
-    sm.safeWriteBlock(new File(0,filename),buf,0,1);
-    
+    sm.safeWriteBlock(new File(0, filename), buf, 1, 0);
+    sm.safeWriteBlock(new File(0, filename), buf, 0, 1);
+
 }
 
 function safeWriteBlock(file, buf, offset, callback) {
