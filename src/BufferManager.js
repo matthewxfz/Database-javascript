@@ -19,7 +19,7 @@ var ReplacementStrategy = {
     PAGE_SIZE = sm.PAGE_SIZE,
     CODING = sm.CODING,
     Heap = require('heap'),
-    LoopQueue = require('./LoopQueue'),
+    Clock = require('./Clock'),
     Queue = require('./Queue'),
     File = require('./File'),
     BM_BufferPool = require('./BM_BufferPool');
@@ -93,7 +93,7 @@ function initSpace(numPages, bp) {
             bp.queue = new Queue(numPages, bp.fixcount);
             break;
         case 2:
-            bp.queue = new LoopQueue(numPages);
+            bp.queue = new Clock(numPages, bp.fixcount);
             break;
         default:
             throw new DBErrors('No such strategy!', DBErrors.type.RC_RM_UNKOWN_DATATYPE);
@@ -228,6 +228,46 @@ function FIFO_pinPage(bp, page) {
     }
 }
 
+/**
+ * Pin page with LRU algorithm
+ * 
+ * @param {any} bp 
+ * @param {any} page 
+ */
+function LRU_pinPage(bp, page) {
+    FIFO_pinPage(bp, page);
+    //pop from tail push from head
+    bp.queue.moveToHead(page.data);
+}
+
+/**
+ * Pin page with CLOCK algorithm
+ * 
+ * @param {any} bp 
+ * @param {any} page 
+ */
+function CLOCK_pinPage(bp, page) {
+   if (bp.queue == undefined) {
+        throw Error('The FIFO queue is not defined!');
+    }
+    var memPage = findMemPageId(bp, page.pageNum);
+    if (memPage !== null) {//if the page is in the buffer
+        page.data = memPage;
+    } else {
+        page.data = getAvailableFrame_CLOCK(bp);
+        if (page.data == null)
+            throw new DBErrors('No page in buffer is available right now!',
+                DBErrors.type.RC_BM_NO_BUFFER_AVAILBLE);
+        else {
+            bp.storage_page_map[page.data] = page.pageNum;
+            bp.fixcount[page.data]++;
+        }
+    }
+    if (bp.dirty[page.data] == 1) {
+        BufferManager.forcePage(bp, page);
+        bp.dirty[page.data] == 0;
+    }
+}
 function updateBufferPoolWhenPageNotDirty_FIFO(bp, avaFrame, page) {
     //read from disk
     sm.safeReadBlock(bp.pageFile, bp.data, avaFrame, (err, buf) => {
@@ -266,7 +306,6 @@ function updateBufferPoolWhenPageIsDirty_FIFO(bp, avaFrame, page) {
 }
 
 
-
 /**
  * Find avalibleFrame based on FIFO strategy
  * 
@@ -284,6 +323,24 @@ function getAvailableFrame_FIFO(bp) {
     return avaFrame;
 }
 
+
+/**
+ * Find avalibleFrame based on CLOCK strategy
+ * 
+ * @param {any} bp 
+ * @returns 
+ */
+function getAvailableFrame_CLOCK(bp) {
+    var avaFrame;
+    if (bp.numPages > bp.queue.length) {// the queue is not full
+        avaFrame = findAvalableBuffer(bp);
+    } else {// the queue is full
+        avaFrame = bp.queue.pop();
+    }
+
+    return avaFrame;
+}
+
 function findAvalableBuffer(bp) {
     for (var i = 0; i < bp.numPages; i++) {
         if (bp.storage_page_map[i] == -1) {
@@ -291,44 +348,6 @@ function findAvalableBuffer(bp) {
         }
     }
 }
-
-/**
- * Pin page with LRU algorithm
- * 
- * @param {any} bp 
- * @param {any} page 
- */
-function LRU_pinPage(bp, page) {
-    FIFO_pinPage(bp, page);
-    //pop from tail push from head
-    bp.queue.moveToHead(page.data);
-}
-
-function CLOCK_pinPage(bp, page) {
-    if (bp.heap == undefined) {
-        throw Error('The LRU queue is not defined!');
-    }
-    if (findMemPageId(page.pageNum)) {//if the page is in the buffer
-        fixcount[page.pageNum]++;
-    } else {
-        if (page.pageNum > bp.queueLength) {// the queue is not full
-            var avaFrame = findAvalableBuffer(bp);
-
-            forcePage(bp, page);
-            bp.storage_page_map[avaFrame] = page.pageNum;
-            dirty[avaFrame] = 0;
-            bp.heap.push(avaFrame);
-            bp.queueLength++;
-        } else {
-            var memPage = bp.heap.pop();
-            forcePage(bp, page);
-            bp.storage_page_map[memPage] = page.pageNum;
-            bp.queueLength--;
-        }
-    }
-}
-
-
 
 function findFilePageId(bp, memPage) {
     return bp.storage_page_map[memPage];
