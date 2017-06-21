@@ -56,7 +56,7 @@ The goal of this assignment is to implement a buffer manager which manages a fix
 
 8.  readPreviousBlock	Read the previous block from file on disk into memory 
 
-9. readCurrentBlock		Read the current block from file on disk into memory
+9. 	readCurrentBlock	Read the current block from file on disk into memory
 
 10. readNextBlock		Read the next block from file on disk into memory
 
