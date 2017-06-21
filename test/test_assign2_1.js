@@ -148,7 +148,7 @@ describe('Test for BufferManager', function () {
         })
 
         it('Should return true by reading page and marking them dirty', () => {
-            for (var i = numLinRequests + 1; i < numLinRequests + numChangeRequests+1; i++) {
+            for (var i = numLinRequests + 1; i < numLinRequests + numChangeRequests + 1; i++) {
                 page.pageNum = requests[i];
                 bm.pinPage(bp, page);
                 bm.markDirty(bp, page);
@@ -178,6 +178,70 @@ describe('Test for BufferManager', function () {
         })
     })
 
+    describe('LRU test', function () {
+        var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
+        var page = new BM_PageHandle(0, 0);
+        const poolContents = [
+            // read first five pages and directly unpin them
+            '[0 0],[-1 0],[-1 0],[-1 0],[-1 0]',
+            '[0 0],[1 0],[-1 0],[-1 0],[-1 0]',
+            '[0 0],[1 0],[2 0],[-1 0],[-1 0]',
+            '[0 0],[1 0],[2 0],[3 0],[-1 0]',
+            '[0 0],[1 0],[2 0],[3 0],[4 0]',
+            // use some of the page to create a fixed LRU order without changing pool content
+            '[0 0],[1 0],[2 0],[3 0],[4 0]',
+            '[0 0],[1 0],[2 0],[3 0],[4 0]',
+            '[0 0],[1 0],[2 0],[3 0],[4 0]',
+            '[0 0],[1 0],[2 0],[3 0],[4 0]',
+            '[0 0],[1 0],[2 0],[3 0],[4 0]',
+            // check that pages get evicted in LRU order
+            '[0 0],[1 0],[2 0],[5 0],[4 0]',
+            '[0 0],[1 0],[2 0],[5 0],[6 0]',
+            '[7 0],[1 0],[2 0],[5 0],[6 0]',
+            '[7 0],[1 0],[8 0],[5 0],[6 0]',
+            '[7 0],[9 0],[8 0],[5 0],[6 0]'
+        ]
+        const orderRequests = [3, 4, 0, 2, 1]
+        const numLRUOrderChange = 5
+        var snapshot = 0;
+        it('Should init a init a buffer pool successfull!', () => {
+            bm.initBufferPool(bp, filename, 5, bm.ReplacementStrategy.RS_LRU)
+        })
 
+        it('Should return true by reading first five pages with direct unpin and no modifications', () => {
+            for (var i = 0; i < 5; i++) {
+                page.pageNum = i;
+                bm.pinPage(bp, page)
+                bm.unpinPage(bp, page)
+                assert.equal(true, ts.bmTestHelper(bp, poolContents[snapshot++]));
+            }
+        })
 
+        it('Should return true by reading pages to change LRU order', () => {
+            for (var i = 0; i < numLRUOrderChange; i++) {
+                page.pageNum = orderRequests[i];
+                bm.pinPage(bp, page)
+                bm.unpinPage(bp, page)
+                assert.equal(true, ts.bmTestHelper(bp, poolContents[snapshot++]));
+            }
+        })
+
+        it('Should return true by replacing pages and check that it happens in LRU order', () => {
+            for (var i = 0; i < 5; i++) {
+                page.pageNum = 5 + i;
+                bm.pinPage(bp, page)
+                bm.unpinPage(bp, page)
+                assert.equal(true, ts.bmTestHelper(bp, poolContents[snapshot++]));
+            }
+        })
+
+        it('Should return 0 of numwriteIO and 10 of numreadIO', () => {
+            assert.equal(0, bm.getNumWriteIO(bp));
+            assert.equal(10, bm.getNumReadIO(bp));
+        })
+
+        it('Should shut down page successfull', () => {
+            bm.shutdownBufferPool(bp)
+        })
+    })
 })

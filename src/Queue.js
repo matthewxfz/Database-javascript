@@ -58,6 +58,31 @@ Queue.prototype.toString = function(){
     return result;
 }
 
+Queue.prototype.moveToHead = function(pageNum){
+    var node = this.head.next;
+    while(node.data != 'head'){
+        if(pageNum == node.data){
+            this.remove(node);
+            this.push(node);
+            return;
+        }
+    }
+}
+
+Queue.prototype.remove = function(node){
+    remove(node);
+}
+
+function remove(node){
+    if(node.data != 'head'){
+        node.pre.next = node.next;
+        node.next.pre = node.pre;
+    }else{
+        throw new Error('cannot delete head!');
+    }
+}
+
+
 function findPopElement(node, fixcount) {
     while (node.data != 'head') {
         if (fixcount[node.data] == 0) {
@@ -68,25 +93,7 @@ function findPopElement(node, fixcount) {
     return null;
 }
 
-Queue.moveToHead = function(pageNum){
-    var node = head.next;
-    while(node.data != 'head'){
-        if(pageNum == node.data){
-            Queue.remove(node);
-            Queue.push(node);
-            return;
-        }
-    }
-}
 
-Queue.remove = function(node){
-    if(node.data != 'head'){
-        node.pre.next = node.next;
-        node.next.pre = node.pre;
-    }else{
-        throw new Error('cannot delete head!');
-    }
-}
 
 
 

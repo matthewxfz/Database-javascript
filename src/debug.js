@@ -27,9 +27,46 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
     this.strategy = strategy;
     this.mgmtData = mgmtData;
 }
-testFIFO2();
+testLRU();
 
 
+
+function testLRU() {
+    var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
+    var page = new BM_PageHandle(0, 0);
+    const poolContents = [
+        // read first five pages and directly unpin them
+        '[0 0],[-1 0],[-1 0],[-1 0],[-1 0]',//0
+        '[0 0],[1 0],[-1 0],[-1 0],[-1 0]',
+        '[0 0],[1 0],[2 0],[-1 0],[-1 0]',
+        '[0 0],[1 0],[2 0],[3 0],[-1 0]',
+        '[0 0],[1 0],[2 0],[3 0],[4 0]',//4
+        // use some of the page to create a fixed LRU order without changing pool content
+        '[0 0],[1 0],[2 0],[3 0],[4 0]',//5
+        '[0 0],[1 0],[2 0],[3 0],[4 0]',
+        '[0 0],[1 0],[2 0],[3 0],[4 0]',
+        '[0 0],[1 0],[2 0],[3 0],[4 0]',
+        '[0 0],[1 0],[2 0],[3 0],[4 0]',//9
+        // check that pages get evicted in LRU order
+        '[0 0],[1 0],[2 0],[5 0],[4 0]',//10
+        '[0 0],[1 0],[2 0],[5 0],[6 0]',
+        '[7 0],[1 0],[2 0],[5 0],[6 0]',
+        '[7 0],[1 0],[8 0],[5 0],[6 0]',
+        '[7 0],[9 0],[8 0],[5 0],[6 0]'//14
+    ]
+    const orderRequests = [3, 4, 0, 2, 1]
+    const numLRUOrderChange = 5
+    var snapshot = 0;
+    bm.initBufferPool(bp, filename, 5, bm.ReplacementStrategy.RS_LRU)
+
+    for (var i = 0; i < 5; i++) {
+        page.pageNum = i;
+        bm.pinPage(bp, page)
+        bm.unpinPage(bp, page)
+        console.log(true, ts.bmTestHelper(bp, poolContents[snapshot++]));
+    }
+
+}
 function testReadFromEmptyFileandCompare(num) {
     var expect = Buffer.alloc(sm.PAGE_SIZE);
     for (var i = 0; i < num; i++) {
@@ -105,7 +142,7 @@ function testFIFO2() {
     bm.pinPage(bp, page);
     assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
 
-    for (var i = numLinRequests + 1; i < numLinRequests + numChangeRequests+1; i++) {
+    for (var i = numLinRequests + 1; i < numLinRequests + numChangeRequests + 1; i++) {
         page.pageNum = requests[i];
         bm.pinPage(bp, page);
         bm.markDirty(bp, page);
@@ -258,33 +295,6 @@ function testFIFO() {
     bm.shutdownBufferPool(bp);
 }
 
-function testLRU() {
-    var file = new File();
-
-    var bp = new BM_BufferPool(fileName, 1, bm.ReplacementStrategy.RS_LRU);
-    var data;
-    var page = new BM_PageHandle(1, data);
-    bm.initBufferPool(bp, fileName, 3, bm.ReplacementStrategy.RS_FIFO, page);
-    for (var i = 0; i < 3; i++) {
-        page.pageNum = i;
-        bm.pinPage(bp, page, i);
-        bm.markDirty(bp, page);
-        bm.unpinPage(bp, page);
-        console.log('Page, ' + page.pageNum + ', ' + page.data + ', ' + bp.dirty[page.data] + ', fixcount, ' + bp.fixcount[page.data]);
-    }
-    bm.pinPage(bp, page, 3);
-
-    bm.shutdownBufferPool(bp);
-}
-
-function testSafeReadBlock() {
-    buf = Buffer.alloc(8196);
-    sm.safeReadBlock(filename, buf, 0, (err, buf) => {
-        console.log(buf.toString('utf8'));
-        console.log(buf.length);
-
-    })
-}
 function testReadStream(callback) {
     const opt = {
         flags: 'r',

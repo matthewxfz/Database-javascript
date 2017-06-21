@@ -38,7 +38,7 @@ bmEmitter.on('forceFlushFinished', function (err, bp, file) {
     }
 })
 
-bmEmitter.on('WriteIO',function(bp){
+bmEmitter.on('WriteIO', function (bp) {
     bp.writeBlockNum++;
 })
 
@@ -130,7 +130,7 @@ BufferManager.shutdownBufferPool = function (bp) {
         for (var i = 0; i < bp.fixcount.length; i++) {
             //console.log('count, ' + bp.fixcount[i] + ', k' + i);
             if (bp.fixcount[i] != 0) {
-                console.log('surprise, ' + bp.fixcount[i] + ', k' + i);
+                //console.log('surprise, ' + bp.fixcount[i] + ', k' + i);
                 throw new DBErrors('Still pages are pinned!');
             }
         }
@@ -159,7 +159,7 @@ BufferManager.forceFlushPool = function (bp) {
 
             // })
         }
-        
+
     }
 }
 
@@ -230,6 +230,7 @@ function FIFO_pinPage(bp, page) {
     if (memPage !== null) {
         page.data = memPage;
         bp.fixcount[page.data]++;
+        return true;
     } else {//the file page is not in the buffe
         page.data = getAvailableFrame_FIFO(bp);// find a page to replace
         if (page.data == null)
@@ -251,6 +252,7 @@ function FIFO_pinPage(bp, page) {
 
             bp.storage_page_map[page.data] = page.pageNum;
             bp.queue.push(page.data);
+            return false;
         }
     }
 }
@@ -272,9 +274,12 @@ function readOnePage(bp, page) {
  * @param {any} page 
  */
 function LRU_pinPage(bp, page) {
-    FIFO_pinPage(bp, page);
-    //pop from tail push from head
-    bp.queue.moveToHead(page.data);
+    if (FIFO_pinPage(bp, page)) {
+        //pop from tail push from head
+        bp.queue.pop(page.data);
+        bp.queue.push(page.data);
+    }
+
 }
 
 /**
@@ -387,7 +392,7 @@ BufferManager.forcePage = function (bp, page, callback) {
         if (page.data < bp.numPages) {
             bp.writeBlockNum++;
             sm.safeWriteBlock(bp.pageFile, bp.data, page.data, page.pageNum, () => {
-                    
+
             });
         } else {
             var err = new DBErrors('Cannot force page since page in buffer is out of boundary!');
