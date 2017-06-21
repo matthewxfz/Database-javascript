@@ -7,7 +7,7 @@ const assert = require('assert')
 var bm = require('../src/BufferManager');
 var BM_PageHandle = require('../src/BufferManagerHelper');
 var BM_BufferPool = require('../src/BM_BufferPool');
-var TestHelper = require('./TestHelper.js');
+var ts = require('./TestHelper');
 
 var sleep = require('sleep')
     , File = require('../src/File')
@@ -116,7 +116,7 @@ describe('Test for BufferManager', function () {
         var request = [0, 1, 2, 3, 4, 4, 5, 6, 0];
         var numLinRequests = 5;
         var numChangeRequests = 3;
-        var ts = new TestHelper();
+        //var ts = new TestHelper();
         it('Should init a init a buffer pool successfull!', () => {
             bm.initBufferPool(bp, filename, 3, bm.ReplacementStrategy.RS_FIFO);
         });

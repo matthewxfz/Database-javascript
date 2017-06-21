@@ -1,6 +1,4 @@
-function testHelper() {
-
-}
+var testHelper = {};
 /**
      * Return if the intput data fits the expect result?
      * 
