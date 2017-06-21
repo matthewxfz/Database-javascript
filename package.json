@@ -23,7 +23,9 @@
   },
   "homepage": "https://github.com/matthewxfz/Database-javascript#readme",
   "dependencies": {
+    "async-lock": "^0.3.9",
     "heap": "^0.2.6",
+    "locks": "^0.2.2",
     "mocha": "^3.4.2",
     "sleep": "^5.1.1"
   }

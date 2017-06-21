@@ -7,6 +7,8 @@ var sm = require('./StorageManager')
     Queue = require('./Queue'),
     TestHelper = require('../test/TestHelper');
 
+var ts = require('../test/TestHelper');
+
 var BM_PageHandle = require('./BufferManagerHelper');
 var bm = require('./BufferManager');
 
@@ -25,15 +27,15 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
     this.strategy = strategy;
     this.mgmtData = mgmtData;
 }
-testFIFO(20);
+testFIFO2();
 
 
 function testReadFromEmptyFileandCompare(num) {
     var expect = Buffer.alloc(sm.PAGE_SIZE);
-    for(var i = 0;i<num;i++){
+    for (var i = 0; i < num; i++) {
         sm.safeWriteBlock(filename, Buffer.alloc(sm.PAGE_SIZE, i, 'utf8'), 0, i);
     }
-    
+
     //console.log('ori, ' + expect.toString('utf8'))
     //sm.safeReadBlock(filename, expect, 0, 0, (err) => {
 
@@ -48,7 +50,7 @@ function testReadFromEmptyFileandCompare(num) {
         bm.pinPage(bp, page);
         sm.safeReadBlock(filename, expect, page.data, page.pageNum);
         bm.unpinPage(bp, page);
-        var corBuf = bp.data.slice(page.data*sm.PAGE_SIZE,(page.data+1)*sm.PAGE_SIZE);
+        var corBuf = bp.data.slice(page.data * sm.PAGE_SIZE, (page.data + 1) * sm.PAGE_SIZE);
         console.log(corBuf.compare(expect));
     }
     //});
@@ -69,9 +71,9 @@ function testFIFO2() {
         "[0 0],[1 0],[-1 0]",
         "[0 0],[1 0],[2 0]",
         "[3 0],[1 0],[2 0]",
-        "[3 0],[4 0],[2 0]",
-        "[3 0],[4 1],[2 0]",
-        "[3 0],[4 1],[5x0]",
+        "[3 0],[4 0],[2 0]",//1
+        "[3 0],[4 1],[2 0]",//2
+        "[3 0],[4 1],[5x0]",//3
         "[6x0],[4 1],[5x0]",
         "[6x0],[4 1],[0x0]",
         "[6x0],[4 0],[0x0]",
@@ -80,8 +82,6 @@ function testFIFO2() {
     const requests = [0, 1, 2, 3, 4, 4, 5, 6, 0];
     const numLinRequests = 5;
     const numChangeRequests = 3;
-
-    var helper = new TestHelper();
 
     var file = new File();
 
@@ -93,14 +93,34 @@ function testFIFO2() {
 
     // reading some pages linearly with direct unpin and no modifications
     for (var i = 0; i < numLinRequests; i++) {
-        page.pageNum = i;
+        page.pageNum = requests[i];
         bm.pinPage(bp, page);
         bm.unpinPage(bp, page);
 
-        assert.equal(true, bmTestHelper(bp, poolContents[i]));
+        assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
     }
 
+    var i = numLinRequests;
+    page.pageNum = requests[i];
+    bm.pinPage(bp, page);
+    assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
 
+    for (var i = numLinRequests + 1; i < numLinRequests + numChangeRequests+1; i++) {
+        page.pageNum = requests[i];
+        bm.pinPage(bp, page);
+        bm.markDirty(bp, page);
+        bm.unpinPage(bp, page);
+        assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
+    }
+
+    // var i = numLinRequests + numChangeRequests + 1;
+    // page.pageNum = 4;
+    // bm.unpinPage(bp, page);
+    // console.log(poolContents[i]);
+    // assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
+    // i++;
+    // bm.forceFlushPool(bp);
+    // assert.equal(false, ts.bmTestHelper(bp, poolContents[i]));
 }
 
 
@@ -206,20 +226,35 @@ function testQueue() {
 
 
 function testFIFO() {
+    var poolContent = [
+        "[0 0],[-1 0],[-1 0]",
+        "[0 0],[1 0],[-1 0]",
+        "[0 0],[1 0],[2 0]",
+        "[3 0],[1 0],[2 0]",
+        "[3 0],[4 0],[2 0]",
+        "[3 0],[4 1],[2 0]",
+        "[3 0],[4 1],[5x0]",
+        "[6x0],[4 1],[5x0]",
+        "[6x0],[4 1],[0x0]",
+        "[6x0],[4 0],[0x0]",
+        "[6 0],[4 0],[0 0]"]
+    var request = [0, 1, 2, 3, 4, 4, 5, 6, 0];
+    var numLinRequests = 5;
+    var numChangeRequests = 3;
+    var page, bp;
+
     var file = new File();
 
     var bp = new BM_BufferPool(fileName, 1, bm.ReplacementStrategy.RS_FIFO);
     var data;
     var page = new BM_PageHandle(1, data);
     bm.initBufferPool(bp, fileName, 3, bm.ReplacementStrategy.RS_FIFO, page);
-    for (var i = 0; i < 22; i++) {
-        page.pageNum = i;
-        bm.pinPage(bp, page, i);
-        bm.markDirty(bp, page);
+    for (var i = 3; i <= 6; i++) {
+        page.pageNum = request[i];
+        bm.pinPage(bp, page, request[i]);
         bm.unpinPage(bp, page);
-        console.log('Page, ' + page.pageNum + ', ' + page.data + ', ' + bp.dirty[page.data] + ', fixcount, ' + bp.fixcount[page.data]);
+        assert.equal(true, ts.bmTestHelper(bp, poolContent[i]))
     }
-
     bm.shutdownBufferPool(bp);
 }
 

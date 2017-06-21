@@ -62,11 +62,11 @@ describe('Test for BufferManager', function () {
                 bm.pinPage(bp, page);
                 bm.markDirty(bp, page);
                 bm.unpinPage(bp, page);
-                
+
             }
         });
 
-        
+
 
         it('Should shut down page successfull', () => {
             bm.shutdownBufferPool(bp);
@@ -101,7 +101,7 @@ describe('Test for BufferManager', function () {
 
 
     describe('FIFO test', function () {
-        var poolContent = [
+        var poolContents = [
             "[0 0],[-1 0],[-1 0]",
             "[0 0],[1 0],[-1 0]",
             "[0 0],[1 0],[2 0]",
@@ -113,9 +113,17 @@ describe('Test for BufferManager', function () {
             "[6x0],[4 1],[0x0]",
             "[6x0],[4 0],[0x0]",
             "[6 0],[4 0],[0 0]"]
-        var request = [0, 1, 2, 3, 4, 4, 5, 6, 0];
+        var requests = [0, 1, 2, 3, 4, 4, 5, 6, 0];
         var numLinRequests = 5;
         var numChangeRequests = 3;
+        var page, bp;
+
+        before(() => {
+            bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
+            page = new BM_PageHandle(0, 0);
+        })
+
+
         //var ts = new TestHelper();
         it('Should init a init a buffer pool successfull!', () => {
             bm.initBufferPool(bp, filename, 3, bm.ReplacementStrategy.RS_FIFO);
@@ -123,28 +131,29 @@ describe('Test for BufferManager', function () {
 
 
         it('Should return true', () => {
-            for (var i = 3; i <= 6; i++) {
-                page.pageNum = request[i];
-                bm.pinPage(bp, page, request[i]);
+            for (var i = 0; i < numLinRequests; i++) {
+                page.pageNum = requests[i];
+                bm.pinPage(bp, page);
                 bm.unpinPage(bp, page);
-                assert.equal(true, ts.bmTestHelper(bp, poolContent[i]))
+
+                assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
             }
         })
 
         it('Should return true by pin one page', () => {
             var i = numLinRequests;
-            page.pageNum = request[i];
-            bm.pinPage(bp, page, request[i]);
-            assert.equal(true, ts.bmTestHelper(bp, poolContent[i]));
+            page.pageNum = requests[i];
+            bm.pinPage(bp, page);
+            assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
         })
 
         it('Should return true by reading page and marking them dirty', () => {
-            for (var i = numLinRequests + 1; i < numLinRequests + numChangeRequests; i++) {
-                page.pageNum = i;
-                bm.pinPage(bp, page, i);
+            for (var i = numLinRequests + 1; i < numLinRequests + numChangeRequests+1; i++) {
+                page.pageNum = requests[i];
+                bm.pinPage(bp, page);
                 bm.markDirty(bp, page);
                 bm.unpinPage(bp, page);
-                assert.equal(true, ts.bmTestHelper(bp, poolContent[i]));
+                assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
             }
         })
 
@@ -152,13 +161,14 @@ describe('Test for BufferManager', function () {
             var i = numLinRequests + numChangeRequests + 1;
             page.pageNum = 4;
             bm.unpinPage(bp, page);
-            assert.equal(true, ts.bmTestHelper(bp, poolContent[i]));
+            assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
             i++;
             bm.forceFlushPool(bp);
-            assert.equal(false, ts.bmTestHelper(bp, poolContent[i]));
+            assert.equal(false, ts.bmTestHelper(bp, poolContents[i]));
         })
 
         it('Should return 3 for writeIO and 8 for readIO', () => {
+            sleep.msleep(10);
             assert.equal(3, bm.getNumWriteIO(bp));
             assert.equal(8, bm.getNumReadIO(bp));
         })

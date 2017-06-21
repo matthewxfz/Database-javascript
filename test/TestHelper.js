@@ -21,9 +21,9 @@ testHelper.bmTestHelper = function(bp, str){
         }
         if(subarray[p] == ' ') val[1] = 0;
         else val[1] = 1;
-
-        if(subarray[p+1] == '-'){
-            val[2] = '-'+subarray[p+2];
+        p++;
+        if(subarray[p] == '-'){
+            val[2] = '-'+subarray[p+1];
         }else{
             val[2] = subarray[p];
         }

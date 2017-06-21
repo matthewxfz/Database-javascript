@@ -9,6 +9,10 @@ const DBErrors = require('./DBErrors'),
     sm = require('./StorageManager'),
     EventEmitter = require('events');;
 
+var locks = require('locks');
+var AsyncLock = require('async-lock');
+var lock = 1;
+
 var ReplacementStrategy = {
     RS_FIFO: 0,
     RS_LRU: 1,
@@ -22,7 +26,8 @@ var ReplacementStrategy = {
     Clock = require('./Clock'),
     Queue = require('./Queue'),
     File = require('./File'),
-    BM_BufferPool = require('./BM_BufferPool');
+    BM_BufferPool = require('./BM_BufferPool'),
+    rwlock = locks.createReadWriteLock();;
 
 class MyEmitter extends EventEmitter { };
 var bmEmitter = new MyEmitter();
@@ -31,6 +36,10 @@ bmEmitter.on('forceFlushFinished', function (err, bp, file) {
     if (isAllZero(bp.dirty)) {
         console.log('file closed');
     }
+})
+
+bmEmitter.on('WriteIO',function(bp){
+    bp.writeBlockNum++;
 })
 
 /**
@@ -72,6 +81,8 @@ BufferManager.initBufferPool = function (bp, pageFileName, numPages, strategy) {
 
         bp.strategy = strategy;
         bp.numPages = numPages;
+        bp.readBlocksNum = 0;
+        bp.writeBlockNum = 0;
         initSpace(numPages, bp);
 
     } catch (error) {
@@ -114,15 +125,15 @@ BufferManager.shutdownBufferPool = function (bp) {
     if (bp.data == undefined)
         throw new DBErrors('Buffer pool Not defined!');
     else
-        console.log('before check' + JSON.parse(JSON.stringify(bp.fixcount)))
-    //check if there is pin page
-    for (var i = 0; i < bp.fixcount.length; i++) {
-        //console.log('count, ' + bp.fixcount[i] + ', k' + i);
-        if (bp.fixcount[i] != 0) {
-            console.log('surprise, ' + bp.fixcount[i] + ', k' + i);
-            throw new DBErrors('Still pages are pinned!');
+        //console.log('before check' + JSON.parse(JSON.stringify(bp.fixcount)))
+        //check if there is pin page
+        for (var i = 0; i < bp.fixcount.length; i++) {
+            //console.log('count, ' + bp.fixcount[i] + ', k' + i);
+            if (bp.fixcount[i] != 0) {
+                console.log('surprise, ' + bp.fixcount[i] + ', k' + i);
+                throw new DBErrors('Still pages are pinned!');
+            }
         }
-    }
     //Objects (including Buffers) are tracked by the garbage collector and deallocated when there are no more references to it
 
     //WRITE DIRTYR PAGE BACK TO THE DISK
@@ -139,11 +150,16 @@ BufferManager.forceFlushPool = function (bp) {
     for (var memPage = 0; memPage < bp.numPages; memPage++) {
         if (bp.dirty[memPage] == 1) {
             //its dirty
-            sm.safeWriteBlock(bp.pageFile, bp.data, memPage, bp.storage_page_map[memPage], () => {
+            var page = new BM_PageHandle(bp.storage_page_map[memPage], memPage);
+            BufferManager.forcePage(bp, page, () => {
                 bp.dirty[memPage] = 0;
                 bmEmitter.emit('forceFlushFinished', null, bp);
-            })
+            });
+            // sm.safeWriteBlock(bp.pageFile, bp.data, memPage, bp.storage_page_map[memPage], () => {
+
+            // })
         }
+        
     }
 }
 
@@ -213,7 +229,8 @@ function FIFO_pinPage(bp, page) {
     var memPage = findMemPageId(bp, page.pageNum);
     if (memPage !== null) {
         page.data = memPage;
-    } else {//the file page is not in the buffer
+        bp.fixcount[page.data]++;
+    } else {//the file page is not in the buffe
         page.data = getAvailableFrame_FIFO(bp);// find a page to replace
         if (page.data == null)
             throw new DBErrors('No page in buffer is available right now!',
@@ -221,31 +238,31 @@ function FIFO_pinPage(bp, page) {
         else {
             if (bp.dirty[page.data] == 1) {
                 BufferManager.forcePage(bp, page, () => {
-                    sm.safeReadBlock(bp.pageFile, bp.data, page.data, page.pageNum, (err, buf) => {
-                        if(err){
-                            bp.fixcount[page.data]--;
-                            throw err;
-                        }
-                    });
                     bp.dirty[page.data] == 0;
+                    readOnePage(bp, page);
+
                     bp.fixcount[page.data]++;
                 });
-
             } else {
-                sm.safeReadBlock(bp.pageFile, bp.data, page.data, page.pageNum, (err, buf) => {
-                    if(err){
-                            bp.fixcount[page.data]--;
-                            throw err;
-                        }
-                    //console.log('pin data'+bp.data.toString('utf8'));
-                });
-                 bp.fixcount[page.data]++;
+                readOnePage(bp, page);
+                bp.fixcount[page.data]++;
             }
+            bp.readBlocksNum++;
 
             bp.storage_page_map[page.data] = page.pageNum;
             bp.queue.push(page.data);
         }
     }
+}
+
+function readOnePage(bp, page) {
+    sm.safeReadBlock(bp.pageFile, bp.data, page.data, page.pageNum, (err, buf) => {
+        if (err) {
+            bp.fixcount[page.data]--;
+            throw err;
+        }
+        //console.log('pin data'+bp.data.toString('utf8'));
+    });
 }
 
 /**
@@ -288,44 +305,6 @@ function CLOCK_pinPage(bp, page) {
         bp.dirty[page.data] == 0;
     }
 }
-function updateBufferPoolWhenPageNotDirty_FIFO(bp, page) {
-    //read from disk
-    sm.safeReadBlock(bp.pageFile, bp.data, page.data, paeg.numPages, (err, buf) => {
-        if (err) {
-            bp.storage_page_map[avaFrame] = -1;
-            bp.fixcount[avaFrame] = 0;
-        }
-    });
-
-    bp.storage_page_map[avaFrame] = page.pageNum;
-    bp.fixcount[avaFrame]++;
-    bp.queue.push(avaFrame);
-
-    page.data = avaFrame;
-}
-
-function updateBufferPoolWhenPageIsDirty_FIFO(bp, avaFrame, page) {
-    //read from disk
-    sm.safeWriteBlock(bp.pageFile, bp.data, avaFrame, page.numPages, (err) => {
-
-        sm.safeReadBlock(bp.pageFile, bp.data, avaFrame, (err, buf) => {
-            if (err) {
-                bp.storage_page_map[avaFrame] = -1;
-                bp.fixcount[avaFrame]--;
-                bp.dirty[avaFrame] = 1;
-            }
-        });
-    });
-
-    bp.storage_page_map[avaFrame] = page.pageNum;
-    bp.fixcount[avaFrame]++;
-    bp.dirty[avaFrame] = 0;
-    bp.queue.push(avaFrame);
-
-    page.data = avaFrame;
-}
-
-
 /**
  * Find avalibleFrame based on FIFO strategy
  * 
@@ -406,7 +385,10 @@ BufferManager.forcePage = function (bp, page, callback) {
         throw err;
     } else {
         if (page.data < bp.numPages) {
-            sm.safeWriteBlock(bp.pageFile, bp.data, page.data, page.pageNum, callback);
+            bp.writeBlockNum++;
+            sm.safeWriteBlock(bp.pageFile, bp.data, page.data, page.pageNum, () => {
+                    
+            });
         } else {
             var err = new DBErrors('Cannot force page since page in buffer is out of boundary!');
             if (callback) callback(err, bp);
@@ -491,7 +473,6 @@ BufferManager.getNumReadIO = function (bp) {
 BufferManager.getNumWriteIO = function (bp) {
     return bp.writeBlockNum;
 }
-
 
 
 BufferManager.ReplacementStrategy = ReplacementStrategy;
