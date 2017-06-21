@@ -37,7 +37,7 @@ describe('Test for BufferManager', function () {
         page.data = 0;
     });
 
-    describe('Create dumme page with 20 iteration', () => {
+    describe('Create dumme page with 22 iteration', () => {
         var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
         var page = new BM_PageHandle(0, 0);
         createDummePage(bp, page, 22);
@@ -47,6 +47,18 @@ describe('Test for BufferManager', function () {
         var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
         var page = new BM_PageHandle(0, 0);
         checkDummePage(bp, page, 20);
+    })//check dumme page
+
+    describe('Create dumme page with 10000 iteration', () => {
+        var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
+        var page = new BM_PageHandle(0, 0);
+        createDummePage(bp, page, 10000);
+    })//check dumme page
+
+    describe('Check dumme page with 10000 iteration', () => {
+        var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
+        var page = new BM_PageHandle(0, 0);
+        checkDummePage(bp, page, 10000);
     })//check dumme page
 
 

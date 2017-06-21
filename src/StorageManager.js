@@ -66,7 +66,30 @@ StorageManaer.openPageFile = function (filename, file, callback) {
         });
 
     });
+}
 
+
+/**
+ * Sync open a file
+ * 
+ * @param {any} filename 
+ * @param {any} file 
+ * @param {any} callback 
+ */
+StorageManaer.openPageFileSync = function (filename, file, callback) {
+    try {
+        var fd = fs.openSync(filename, 'w+');
+        var stats = fs.fstatSync(fd);
+    } catch (error) {
+        if (err.code == 'ENOENT')
+            err = new DBErrors('File already exist', DBErrors.type.RC_FILE_EXIST);
+        if (callback) callback(err, file);
+    }
+    file.fileName = filename;
+    file.totalPageNumber = stats.size / PAGE_SIZE;
+    file.curPagePos = 0;
+    file.fd = fd;
+    if (callback) callback(null, file);
 }
 
 /**
@@ -145,15 +168,15 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
  * 
  * @param {any} callback 
  */
-StorageManaer.safeReadBlock = function (filename, buf, offset, position, callback){
+StorageManaer.safeReadBlock = function (filename, buf, offset, position, callback) {
     const opt = {
         flags: 'r',
         encoding: 'utf8',
         fd: null,
         mode: 0o666,
         autoClose: true,
-        start: position*PAGE_SIZE,
-        end: position*PAGE_SIZE + PAGE_SIZE
+        start: position * PAGE_SIZE,
+        end: position * PAGE_SIZE + PAGE_SIZE
     };
     var readStream = fs.createReadStream(filename, opt);
     //readStream.resume();
@@ -165,11 +188,11 @@ StorageManaer.safeReadBlock = function (filename, buf, offset, position, callbac
     });
     readStream.on('end', () => {
         // console.log('end');
-        if(callback) callback(null, buf);
+        if (callback) callback(null, buf);
     });
 
     readStream.on('error', (err) => {
-       if(callback) callback(err, buf);
+        if (callback) callback(err, buf);
     });
 }
 
@@ -290,20 +313,20 @@ StorageManaer.writeBlock = function (pageNum, file, memPage, callback) {
  * @param {any} position --page in file
  * @param {any} callback 
  */
-StorageManaer.safeWriteBlock = function(filename, buf, offset, position, callback) {
+StorageManaer.safeWriteBlock = function (filename, buf, offset, position, callback) {
     var opt = {
         flags: 'w+',
         defaultEncoding: 'utf8',
         fd: null,
         mode: 0o666,
         autoClose: true,
-        start: position*PAGE_SIZE
+        start: position * PAGE_SIZE
     }
     var writeStream = fs.createWriteStream(filename, opt);
 
     keepWrite(callback);
     function keepWrite(callback) {
-        var ok = writeStream.write(buf.slice(offset*PAGE_SIZE, (offset+1)*PAGE_SIZE), 'utf8', callback);
+        var ok = writeStream.write(buf.slice(offset * PAGE_SIZE, (offset + 1) * PAGE_SIZE), 'utf8', callback);
         if (!ok)
             writeStream.once('drain', keepWrite());
     }
