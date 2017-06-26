@@ -41,12 +41,12 @@ describe('Functionality Test',function() {
     });
 
     describe('Schema Test',function() {
-        var attname = ['ID','Name','Score'],
-                dt = [0,2,1],
-                tl = [3,10,5],
+        var attname = ['ID','Name','Score','HighGPA'],
+                dt = [0,2,1,3],
+                tl = [3,10,5,2],
                 ka = [0,2],
                 ks = ka.length,
-                sch = new Schema(3,attname,dt,tl,ka,ks);
+                sch = new Schema(4,attname,dt,tl,ka,ks);
         it('Serialize Schema',() => {
             console.log(rms.serializeSchema(sch));
         });
@@ -57,11 +57,11 @@ describe('Functionality Test',function() {
             console.log(rms.serializeTableInfo(rel));
         })
         var rid = new RID(0,2);
-        var data = [1,'zhiquan',100];
+        var data = [1,'zhiquan',100,true];
         var rc = new Record(rid,data);
 
         it('serializeAttr',() => {
-            console.log(rms.serializeAttr(rc,sch,1));
+            console.log(rms.serializeAttr(rc,sch,3));
         })
 
         it('serializeRecord',() => {

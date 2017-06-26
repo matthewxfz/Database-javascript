@@ -104,7 +104,7 @@ Serializer.serializeAttr = function(record,schema,attrNum) {
         {
             var len = schema.typeLength[attrNum];
             var buf = record.data[attrNum].substr(0,len);
-            buf += '\0';
+            // buf += '\0';
             var string = schema.attrNames[attrNum] + ':' + buf;
             tb.Append(result,string);
         }
@@ -119,7 +119,7 @@ Serializer.serializeAttr = function(record,schema,attrNum) {
         case DatatypeEnum.DT_BOOL:
         {
            var val = record.data[attrNum];
-           var string = schema.attrNames[attrNum] + ":" + val ? 'true' : 'false';
+           var string = schema.attrNames[attrNum] + ":" + (val ? 'true' : 'false');
            tb.Append(result,string);
         }
         break;
