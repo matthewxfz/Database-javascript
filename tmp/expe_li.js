@@ -72,11 +72,11 @@ var Value = function(dt,value){
 //console.log('output:  '+v.stringV);
 //console.log(datatype['DT_INT']);
 
-var ex = new Expr(2,2);
-ex.args1.dt = 0;
-var left = new Value(datatype['DT_STRING'],'1234');
-ex.args1.cons  = left;
-console.log(ex.args1.cons);
+//var ex = new Expr(2,2);
+//ex.args1.dt = 0;
+//var left = new Value(datatype['DT_STRING'],'1234');
+//ex.args1.cons  = left;
+//console.log(ex.args1.cons);
 
 
 function strcmp(str1,str2){
@@ -278,8 +278,8 @@ EXPR.boolOr = function(left,right,result){
 EXPR.evalExpr =function(record, schema, expr,result){
     var lIn = new Value();  
     var rIn = new Value(); 
-    var result = new Value();
     MAKE_VALUE(result,0,-1);
+    //MAKE_VALUE(result,3,true);
     switch(expr.dt){
         case 2:{
             var twoArgs = (expr.optype != 2);
@@ -364,6 +364,14 @@ EXPR.evalExpr =function(record, schema, expr,result){
     }
 
 }
+
+//var ex = new Expr(2,2);
+//ex.args1.dt = 0;
+//var left = new Value(datatype['DT_BOOL'],false);
+//ex.args1.cons = left;
+//var result1 = new Value();
+//EXPR.evalExpr(1,1,ex,result1);
+//console.log(result1.boolV);
 
 EXPR.freeExpr=function(expr){
     switch(expr.dt){
