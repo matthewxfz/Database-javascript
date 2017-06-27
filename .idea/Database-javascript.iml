@@ -8,5 +8,8 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="node-DefinitelyTyped" level="application" />
+    <orderEntry type="library" name="node-fetch-DefinitelyTyped" level="application" />
+    <orderEntry type="library" name="node-cache-DefinitelyTyped" level="application" />
   </component>
 </module>

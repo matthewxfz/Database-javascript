@@ -1,19 +1,23 @@
 'use strict'
-var sm = require('./StorageManager')
-    , fs = require('fs')
-    , File = require('./File')
-    , util = require('./util'),
+var sm = require('./SM/StorageManager'),
+    rm =require('./RM/RecordManager'),
+    fs = require('fs'),
+    File = require('./BM/File'),
+    util = require('./util'),
     assert = require('assert'),
-    Queue = require('./Queue'),
-    TestHelper = require('../test/TestHelper');
+    Queue = require('./BM/Queue'),
+    TestHelper = require('../test/TestHelper'),
+    Constants = require('./Constants');
 
 var ts = require('../test/TestHelper');
 
-var BM_PageHandle = require('./BufferManagerHelper');
-var bm = require('./BufferManager');
+var BM_PageHandle = require('./BM/Page');
+var bm = require('./BM/BufferManager');
 
-var Clock = require('./Clock'),
+var Clock = require('./BM/Clock'),
     Heap = require('heap');
+
+var buf = Buffer.alloc(Constants.PAGE_SIZE);
 
 const async = require('async');
 var filename = '/Users/matthewxfz/Workspaces/gits/Database-javascript/file.test',
@@ -27,8 +31,47 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
     this.strategy = strategy;
     this.mgmtData = mgmtData;
 }
-testLRU();
 
+
+buf.writeInt16BE(17,0);
+console.log(buf);
+
+function testCreateSchema() {
+    var path = '/Users/matthewxfz/Workspaces/gits/Database-javascript/dictionary';
+    var buf = Buffer.alloc(sm.PAGE_SIZE);
+    var numSlots = Math.floor(sm.PAGE_SIZE / (Constants.RID + Constants.schemaRecordLength));
+    for (var i = 0; i < numSlots * 8; i += 4) {
+        buf.writeInt32BE(-1, i);
+    }
+
+    var buf2 = Buffer.alloc(sm.PAGE_SIZE).fill('a');
+    console.log(buf.readInt32BE(0, 4));
+    sm.safeWriteBlock(path, buf, 0, 0, () => {
+        sm.safeReadBlock(path, buf2, 0, 0, () => {
+            console.log(buf2.readInt32BE(0,4));
+        })
+    });
+}
+
+function testCheck() {
+    var workdir = '/Users/matthewxfz/Workspaces/gits/Database-javascript/test';
+
+    checkDir(workdir + '/JSDB', (err) => {
+        checkDir(workdir + '/JSDB/schema');
+        checkDir(workdir + '/JSDB/tables');
+        checkDir(workdir + '/JSDB/index');
+        checkDir(workdir + '/JSDB/views');
+    });
+}
+
+function checkDir(dir, cb) {
+    fs.access(dir, fs.constants.W_OK, (err) => {
+        if (err.code = 'ENOENT')
+            fs.mkdir(dir, 0o744, cb);
+        else
+            cb(err);
+    })
+}
 
 
 function testLRU() {
@@ -171,11 +214,11 @@ function testHelper() {
 }
 
 /**
-     * Return if the intput data fits the expect result?
-     * 
-     * @param {BM_BufferPool} bp -- buffer pool
-     * @param {string} [str=[i]]  --expect result in a moment i
-     */
+ * Return if the intput data fits the expect result?
+ *
+ * @param {BM_BufferPool} bp -- buffer pool
+ * @param {string} [str=[i]]  --expect result in a moment i
+ */
 function bmTestHelper(bp, str) {
     var count = 0;
     var array = str.split(',');
@@ -211,11 +254,6 @@ function bmTestHelper(bp, str) {
 }
 
 
-
-
-
-
-
 function testWriteStream(callback) {
     buf = Buffer.alloc(2 * 4096).fill('a', 0, 4095);
     buf.fill('b', 4096, 2 * 4096 - 1);
@@ -225,14 +263,15 @@ function testWriteStream(callback) {
 }
 
 function safeWriteBlock(file, buf, offset, callback) {
-    var opt = {
+    var opt;
+    opt = {
         flags: 'w+',
         defaultEncoding: 'utf8',
         fd: null,
         mode: 0o666,
         autoClose: true,
         start: offset
-    }
+    };
     var writeStream = fs.createWriteStream(file.fileName, opt);
 
     keepWrite(callback);
@@ -242,8 +281,6 @@ function safeWriteBlock(file, buf, offset, callback) {
             writeStream.once('drain', keepWrite());
     }
 }
-
-
 
 function testQueue() {
     var fixcount = [0, 0, 1, 0];

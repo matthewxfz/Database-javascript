@@ -1,16 +1,16 @@
 'use strict';
 const assert = require('assert')
-    , sm = require('../src/StorageManager.js')
+    , sm = require('../src/SM/StorageManager.js')
     , path = require('path')
     , async = require('async');
 
-var bm = require('../src/BufferManager');
-var BM_PageHandle = require('../src/BufferManagerHelper');
-var BM_BufferPool = require('../src/BM_BufferPool');
+var bm = require('../src/BM/BufferManager');
+var BM_PageHandle = require('../src/BM/Page');
+var BM_BufferPool = require('../src/BM/BM_BufferPool');
 var ts = require('./TestHelper');
 
 var sleep = require('sleep')
-    , File = require('../src/File')
+    , File = require('../src/BM/File')
     , util = require('../src/util')
     , fs = require('fs');
 
@@ -142,7 +142,7 @@ describe('Test for BufferManager', function () {
         });
 
 
-        it('Should return true', () => {
+        it('Should have right pool content after reading some pages linearly with direct unpin and no modifications', () => {
             for (var i = 0; i < numLinRequests; i++) {
                 page.pageNum = requests[i];
                 bm.pinPage(bp, page);
@@ -152,14 +152,14 @@ describe('Test for BufferManager', function () {
             }
         })
 
-        it('Should return true by pin one page', () => {
+        it('Should have right pool content after pinning one page and test remainder', () => {
             var i = numLinRequests;
             page.pageNum = requests[i];
             bm.pinPage(bp, page);
             assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
         })
 
-        it('Should return true by reading page and marking them dirty', () => {
+        it('Should have right pool content after reading pages and mark them as dirty', () => {
             for (var i = numLinRequests + 1; i < numLinRequests + numChangeRequests + 1; i++) {
                 page.pageNum = requests[i];
                 bm.pinPage(bp, page);
@@ -169,7 +169,7 @@ describe('Test for BufferManager', function () {
             }
         })
 
-        it('Should return true after unpin last page', () => {
+        it('Should have right pool content after flushing buffer pool to disk', () => {
             var i = numLinRequests + numChangeRequests + 1;
             page.pageNum = 4;
             bm.unpinPage(bp, page);
@@ -179,7 +179,7 @@ describe('Test for BufferManager', function () {
             assert.equal(false, ts.bmTestHelper(bp, poolContents[i]));
         })
 
-        it('Should return 3 for writeIO and 8 for readIO', () => {
+        it('Should have right write/read IOs', () => {
             sleep.msleep(10);
             assert.equal(3, bm.getNumWriteIO(bp));
             assert.equal(8, bm.getNumReadIO(bp));

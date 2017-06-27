@@ -4,11 +4,12 @@ var fs = require('fs')
     , async = require('async')
     , path = require('path')
     , StorageManaer = {}
-    , DBErrors = require('./DBErrors')
-    , File = require('./File');
+    , DBErrors = require('../DBErrors')
+    , File = require('../BM/File')
+    , Constants = require('../Constants');
 
-const PAGE_SIZE = 4096;
-const CODING = 'utf8';
+const PAGE_SIZE = Constants.PAGE_SIZE;
+const CODING = Constants.CODING;
 
 /**
  * Init the storage Manager
@@ -66,6 +67,18 @@ StorageManaer.openPageFile = function (filename, file, callback) {
         });
 
     });
+}
+
+/**
+ * Return teh number of pages in a file
+ * @param filename
+ * @returns {number}
+ */
+StorageManaer.getPageNumofFile = function(filename){
+    const fd = fs.openSync(filename,'r+');
+    var state = fs.fstatSync(fd);
+
+    return stats.size / PAGE_SIZE;
 }
 
 
@@ -141,20 +154,6 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
     }
 }
 
-// StorageManaer.readBlockSync = function (pageNum, file, memPage, callback) {
-//     if (file.curPagePos < 0 || file.curPagePos >= file.totalPageNumber) {
-//         callback(new DBErrors("Current page number is not valid", DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY));
-//     } else {
-//         fs.read(file.fd, memPage, 0, PAGE_SIZE, pageNum * PAGE_SIZE, function (err, bytesRead, buffer) {
-//             if (err) {
-//                 err = DBErrors('Operation not permited', DBErrors.type.RC_READ_FAILED);
-//             }
-//             callback(err, buffer);
-//         });
-//     }
-// }
-
-
 
 
 
@@ -170,8 +169,8 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
  */
 StorageManaer.safeReadBlock = function (filename, buf, offset, position, callback) {
     const opt = {
-        flags: 'r',
-        encoding: 'utf8',
+        flags: 'r+',
+        encoding: 'hex',
         fd: null,
         mode: 0o666,
         autoClose: true,
@@ -182,7 +181,7 @@ StorageManaer.safeReadBlock = function (filename, buf, offset, position, callbac
     //readStream.resume();
     readStream.on('data', (chunk) => {
         //console.log('data'+chunk);
-        buf.write(chunk, offset, 'utf8');
+        buf.write(chunk, offset,'hex');
         //console.log('buf'+buf);
         offset += chunk.length;
     });
@@ -316,7 +315,7 @@ StorageManaer.writeBlock = function (pageNum, file, memPage, callback) {
 StorageManaer.safeWriteBlock = function (filename, buf, offset, position, callback) {
     var opt = {
         flags: 'w+',
-        defaultEncoding: 'utf8',
+        defaultEncoding: 'hex',
         fd: null,
         mode: 0o666,
         autoClose: true,
@@ -326,7 +325,7 @@ StorageManaer.safeWriteBlock = function (filename, buf, offset, position, callba
 
     keepWrite(callback);
     function keepWrite(callback) {
-        var ok = writeStream.write(buf.slice(offset * PAGE_SIZE, (offset + 1) * PAGE_SIZE), 'utf8', callback);
+        var ok = writeStream.write(buf.slice(offset * PAGE_SIZE, (offset + 1) * PAGE_SIZE), 'hex', callback);
         if (!ok)
             writeStream.once('drain', keepWrite());
     }
