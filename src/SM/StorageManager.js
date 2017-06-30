@@ -4,11 +4,12 @@ var fs = require('fs')
     , async = require('async')
     , path = require('path')
     , StorageManaer = {}
-    , DBErrors = require('./DBErrors')
-    , File = require('./File');
+    , DBErrors = require('../DBErrors')
+    , File = require('../BM/File')
+    , Constants = require('../Constants');
 
-const PAGE_SIZE = 4096;
-const CODING = 'utf8';
+const PAGE_SIZE = Constants.PAGE_SIZE;
+const CODING = Constants.CODING;
 
 /**
  * Init the storage Manager
@@ -66,7 +67,42 @@ StorageManaer.openPageFile = function (filename, file, callback) {
         });
 
     });
+}
 
+/**
+ * Return teh number of pages in a file
+ * @param filename
+ * @returns {number}
+ */
+StorageManaer.getPageNumofFile = function(filename){
+    const fd = fs.openSync(filename,'r+');
+    var state = fs.fstatSync(fd);
+
+    return stats.size / PAGE_SIZE;
+}
+
+
+/**
+ * Sync open a file
+ * 
+ * @param {any} filename 
+ * @param {any} file 
+ * @param {any} callback 
+ */
+StorageManaer.openPageFileSync = function (filename, file, callback) {
+    try {
+        var fd = fs.openSync(filename, 'w+');
+        var stats = fs.fstatSync(fd);
+    } catch (error) {
+        if (error.code == 'ENOENT')
+            error = new DBErrors('File already exist', DBErrors.type.RC_FILE_EXIST);
+        if (callback) callback(err, file);
+    }
+    file.fileName = filename;
+    file.totalPageNumber = stats.size / PAGE_SIZE;
+    file.curPagePos = 0;
+    file.fd = fd;
+    if (callback) callback(null, file);
 }
 
 /**
@@ -98,6 +134,20 @@ StorageManaer.destroyPageFile = function (file, callback) {
     });
 }
 
+StorageManaer.destroyFile = function(fileName, cb){
+
+    fs.unlink(fileName, (err)=>{
+        if(cb) cb(err);
+        else{
+            if(err) throw err;
+        }
+    })
+}
+
+StorageManaer.destroyJSONFileSync = function(fileName, cb){
+    fs.unlinkSync(fileName);
+}
+
 /**
  * Async read the data from disk to buffer.
  * 
@@ -118,58 +168,44 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
     }
 }
 
-// StorageManaer.readBlockSync = function (pageNum, file, memPage, callback) {
-//     if (file.curPagePos < 0 || file.curPagePos >= file.totalPageNumber) {
-//         callback(new DBErrors("Current page number is not valid", DBErrors.type.RC_PAGE_NUMBER_OUT_OF_BOUNDRY));
-//     } else {
-//         fs.read(file.fd, memPage, 0, PAGE_SIZE, pageNum * PAGE_SIZE, function (err, bytesRead, buffer) {
-//             if (err) {
-//                 err = DBErrors('Operation not permited', DBErrors.type.RC_READ_FAILED);
-//             }
-//             callback(err, buffer);
-//         });
-//     }
-// }
-
-
 
 
 
 /**
  * Safely read one block multiple time using stream
- * 
+ *
  * @param {any} filename --file path
  * @param {any} buffer --written file
  * @param {any} offset --start page in the buffer
  * @param {any} position --start page in the file
- * 
- * @param {any} callback 
+ *
+ * @param {any} callback
  */
-StorageManaer.safeReadBlock = function (filename, buf, offset, position, callback){
+StorageManaer.safeReadBlock = function (filename, buf, offset, position, callback) {
     const opt = {
-        flags: 'r',
-        encoding: 'utf8',
+        flags: 'r+',
+        encoding: 'hex',
         fd: null,
         mode: 0o666,
         autoClose: true,
-        start: position*PAGE_SIZE,
-        end: position*PAGE_SIZE + PAGE_SIZE
+        start: position * PAGE_SIZE,
+        end: position * PAGE_SIZE + PAGE_SIZE
     };
     var readStream = fs.createReadStream(filename, opt);
     //readStream.resume();
     readStream.on('data', (chunk) => {
         //console.log('data'+chunk);
-        buf.write(chunk, offset, 'utf8');
+        buf.write(chunk, offset,'hex');
         //console.log('buf'+buf);
         offset += chunk.length;
     });
     readStream.on('end', () => {
         // console.log('end');
-        if(callback) callback(null, buf);
+        if (callback) callback(null, buf);
     });
 
     readStream.on('error', (err) => {
-       if(callback) callback(err, buf);
+        if (callback) callback(err, buf);
     });
 }
 
@@ -290,24 +326,75 @@ StorageManaer.writeBlock = function (pageNum, file, memPage, callback) {
  * @param {any} position --page in file
  * @param {any} callback 
  */
-StorageManaer.safeWriteBlock = function(filename, buf, offset, position, callback) {
+StorageManaer.safeWriteBlock = function (filename, buf, offset, position, callback) {
     var opt = {
         flags: 'w+',
-        defaultEncoding: 'utf8',
+        defaultEncoding: 'hex',
         fd: null,
         mode: 0o666,
         autoClose: true,
-        start: position*PAGE_SIZE
+        start: position * PAGE_SIZE
     }
     var writeStream = fs.createWriteStream(filename, opt);
 
     keepWrite(callback);
     function keepWrite(callback) {
-        var ok = writeStream.write(buf.slice(offset*PAGE_SIZE, (offset+1)*PAGE_SIZE), 'utf8', callback);
+        var ok = writeStream.write(buf.slice(offset * PAGE_SIZE, (offset + 1) * PAGE_SIZE), 'hex', callback);
         if (!ok)
             writeStream.once('drain', keepWrite());
     }
 }
+
+/**
+ * This is used for safe write override a JSON sting to file, you should use this function in multiple writting situation
+ *
+ * @param {any} file
+ * @param {any} buf
+ * @param {any} offset --page in buffer
+ * @param {any} position --page in file
+ * @param {any} callback
+ */
+StorageManaer.writeJSON = function (filename, buf, callback) {
+    var opt = {
+        flags: 'w+',
+        defaultEncoding: 'hex',
+        fd: null,
+        mode: 0o666,
+        autoClose: true,
+        start: 0
+    }
+    var writeStream = fs.createWriteStream(filename, opt);
+
+    keepWrite(callback);
+    function keepWrite(callback) {
+        var ok = writeStream.write(buf, Constants.CODING, callback);
+        if (!ok)
+            writeStream.once('drain', keepWrite());
+    }
+}
+
+StorageManaer.writeJSONSync = function (filename, buf, callback) {
+    fs.writeFileSync(filename,buf,Constants.CODING);
+}
+
+/**
+ * Safely read file to JSON string
+ *
+ * @param {any} filename --file path
+ * @param {any} buffer --written file
+ * @param {any} offset --start page in the buffer
+ * @param {any} position --start page in the file
+ *
+ * @param {any} callback
+ */
+StorageManaer.readJSON = function (filename, callback) {
+    fs.access(filename,fs.constants.R_OK, (err)=>{
+        if(err) throw err;
+    });
+    return fs.readFileSync(filename,Constants.CODING);
+}
+
+
 
 
 /**

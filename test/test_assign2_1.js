@@ -1,16 +1,16 @@
 'use strict';
 const assert = require('assert')
-    , sm = require('../src/StorageManager.js')
+    , sm = require('../src/SM/StorageManager.js')
     , path = require('path')
     , async = require('async');
 
-var bm = require('../src/BufferManager');
-var BM_PageHandle = require('../src/BufferManagerHelper');
-var BM_BufferPool = require('../src/BM_BufferPool');
+var bm = require('../src/BM/BufferManager');
+var BM_PageHandle = require('../src/BM/Page');
+var BM_BufferPool = require('../src/BM/BM_BufferPool');
 var ts = require('./TestHelper');
 
 var sleep = require('sleep')
-    , File = require('../src/File')
+    , File = require('../src/BM/File')
     , util = require('../src/util')
     , fs = require('fs');
 
@@ -37,7 +37,7 @@ describe('Test for BufferManager', function () {
         page.data = 0;
     });
 
-    describe('Create dumme page with 20 iteration', () => {
+    describe('Create dumme page with 22 iteration', () => {
         var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
         var page = new BM_PageHandle(0, 0);
         createDummePage(bp, page, 22);
@@ -47,6 +47,18 @@ describe('Test for BufferManager', function () {
         var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
         var page = new BM_PageHandle(0, 0);
         checkDummePage(bp, page, 20);
+    })//check dumme page
+
+    describe('Create dumme page with 10000 iteration', () => {
+        var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
+        var page = new BM_PageHandle(0, 0);
+        createDummePage(bp, page, 10000);
+    })//check dumme page
+
+    describe('Check dumme page with 10000 iteration', () => {
+        var bp = new BM_BufferPool(filename, 3, bm.ReplacementStrategy.RS_FIFO);
+        var page = new BM_PageHandle(0, 0);
+        checkDummePage(bp, page, 10000);
     })//check dumme page
 
 
@@ -130,7 +142,7 @@ describe('Test for BufferManager', function () {
         });
 
 
-        it('Should return true', () => {
+        it('Should have right pool content after reading some pages linearly with direct unpin and no modifications', () => {
             for (var i = 0; i < numLinRequests; i++) {
                 page.pageNum = requests[i];
                 bm.pinPage(bp, page);
@@ -140,14 +152,14 @@ describe('Test for BufferManager', function () {
             }
         })
 
-        it('Should return true by pin one page', () => {
+        it('Should have right pool content after pinning one page and test remainder', () => {
             var i = numLinRequests;
             page.pageNum = requests[i];
             bm.pinPage(bp, page);
             assert.equal(true, ts.bmTestHelper(bp, poolContents[i]));
         })
 
-        it('Should return true by reading page and marking them dirty', () => {
+        it('Should have right pool content after reading pages and mark them as dirty', () => {
             for (var i = numLinRequests + 1; i < numLinRequests + numChangeRequests + 1; i++) {
                 page.pageNum = requests[i];
                 bm.pinPage(bp, page);
@@ -157,7 +169,7 @@ describe('Test for BufferManager', function () {
             }
         })
 
-        it('Should return true after unpin last page', () => {
+        it('Should have right pool content after flushing buffer pool to disk', () => {
             var i = numLinRequests + numChangeRequests + 1;
             page.pageNum = 4;
             bm.unpinPage(bp, page);
@@ -167,7 +179,7 @@ describe('Test for BufferManager', function () {
             assert.equal(false, ts.bmTestHelper(bp, poolContents[i]));
         })
 
-        it('Should return 3 for writeIO and 8 for readIO', () => {
+        it('Should have right write/read IOs', () => {
             sleep.msleep(10);
             assert.equal(3, bm.getNumWriteIO(bp));
             assert.equal(8, bm.getNumReadIO(bp));

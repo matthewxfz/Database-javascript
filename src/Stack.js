@@ -1,6 +1,9 @@
+/**
+ * Created by matthewxfz on 6/30/17.
+ */
 var Iterator = require('./Iterator');
 
-var Queue = function () {
+var Stack = function () {
     this.head = new Node('head', null, null);
 
     this.head.pre = this.head;
@@ -14,14 +17,14 @@ function Node(data, pre, next) {
     this.next = next;
 }
 
-Queue.prototype.peek = function () {
+Stack.prototype.peek = function () {
     if (this.length == 0) return null;
     else {
-        return this.head.pre.data;
+        return this.head.next.data;
     }
 }
 
-Queue.prototype.push = function (data) {
+Stack.prototype.push = function (data) {
 
     var node = new Node(data, null, null);
     node.pre = this.head;
@@ -33,7 +36,7 @@ Queue.prototype.push = function (data) {
 
 }
 
-Queue.prototype.pop = function () {
+Stack.prototype.pop = function () {
     var node = this.peek();
 
     if (node == null) return null;
@@ -43,7 +46,7 @@ Queue.prototype.pop = function () {
     return node.data;
 }
 
-Queue.prototype.remove = function (node) {
+Stack.prototype.remove = function (node) {
     remove(node);
 }
 
@@ -57,7 +60,7 @@ function remove(node) {
     }
 }
 
-Queue.prototype.iterator = function(){
+Stack.prototype.iterator = function(){
     "use strict";
     return new Iterator(this.head);
 };
@@ -65,4 +68,4 @@ Queue.prototype.iterator = function(){
 
 
 
-module.exports = Queue;
+module.exports = Stack;

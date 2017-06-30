@@ -29,7 +29,7 @@ The goal of this assignment is to implement a buffer manager which manages a fix
 ./src/File.js             file handle object
 ./src/StorageManager.js   storage manager 
 ./src/BufferManger.js     Buffer manager
-./src/Queue.js            queue for buffer manger FIFO and LRU
+./src/BMQueue.js            queue for buffer manger FIFO and LRU
 ./src/BufferManagerHelper page handle
 ./src/BM_BufferPool       buffer pool handle
 ./test/test_assign1_1.js  test cases for storage manager
