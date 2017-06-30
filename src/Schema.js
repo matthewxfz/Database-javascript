@@ -6,4 +6,6 @@ function Schema (numAttr,attrNames,dataTypes,typeLength,keyAttrs,keySize) {
     this.keyAttrs = keyAttrs;
     this.keySize = keySize;
 }
+
+
 module.exports = Schema;

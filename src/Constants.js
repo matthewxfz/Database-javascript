@@ -2,6 +2,7 @@
  * Created by matthewxfz on 6/26/17.
  */
 var Constants = {
+    workdir:'/Users/matthewxfz/Workspaces/gits/Database-javascript/test',
     //sm
     PAGE_SIZE:4096,
     CODING:'utf8',
@@ -18,8 +19,11 @@ var Constants = {
     tablesdir:'/JSDB/tables/',
     viewsdir:'/JSDB/views/',
     index:'/JSDB/index/',
-    disctionary:'/catalog',
-    dictionaryBPLength:10
+    catalog:'/JSDB/catalog',
+    catalogBPLength:10,
+    catalogStra:0,//FIFO
+    defaultStra:0, //FIFO
+    defaultBPSize:20
 
 }
 

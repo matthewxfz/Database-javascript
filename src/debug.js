@@ -5,7 +5,7 @@ var sm = require('./SM/StorageManager'),
     File = require('./BM/File'),
     util = require('./util'),
     assert = require('assert'),
-    Queue = require('./BM/Queue'),
+    Queue = require('./BM/BMQueue'),
     TestHelper = require('../test/TestHelper'),
     Constants = require('./Constants');
 

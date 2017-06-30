@@ -94,8 +94,8 @@ StorageManaer.openPageFileSync = function (filename, file, callback) {
         var fd = fs.openSync(filename, 'w+');
         var stats = fs.fstatSync(fd);
     } catch (error) {
-        if (err.code == 'ENOENT')
-            err = new DBErrors('File already exist', DBErrors.type.RC_FILE_EXIST);
+        if (error.code == 'ENOENT')
+            error = new DBErrors('File already exist', DBErrors.type.RC_FILE_EXIST);
         if (callback) callback(err, file);
     }
     file.fileName = filename;
@@ -134,6 +134,20 @@ StorageManaer.destroyPageFile = function (file, callback) {
     });
 }
 
+StorageManaer.destroyFile = function(fileName, cb){
+
+    fs.unlink(fileName, (err)=>{
+        if(cb) cb(err);
+        else{
+            if(err) throw err;
+        }
+    })
+}
+
+StorageManaer.destroyJSONFileSync = function(fileName, cb){
+    fs.unlinkSync(fileName);
+}
+
 /**
  * Async read the data from disk to buffer.
  * 
@@ -159,13 +173,13 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
 
 /**
  * Safely read one block multiple time using stream
- * 
+ *
  * @param {any} filename --file path
  * @param {any} buffer --written file
  * @param {any} offset --start page in the buffer
  * @param {any} position --start page in the file
- * 
- * @param {any} callback 
+ *
+ * @param {any} callback
  */
 StorageManaer.safeReadBlock = function (filename, buf, offset, position, callback) {
     const opt = {
@@ -330,6 +344,57 @@ StorageManaer.safeWriteBlock = function (filename, buf, offset, position, callba
             writeStream.once('drain', keepWrite());
     }
 }
+
+/**
+ * This is used for safe write override a JSON sting to file, you should use this function in multiple writting situation
+ *
+ * @param {any} file
+ * @param {any} buf
+ * @param {any} offset --page in buffer
+ * @param {any} position --page in file
+ * @param {any} callback
+ */
+StorageManaer.writeJSON = function (filename, buf, callback) {
+    var opt = {
+        flags: 'w+',
+        defaultEncoding: 'hex',
+        fd: null,
+        mode: 0o666,
+        autoClose: true,
+        start: 0
+    }
+    var writeStream = fs.createWriteStream(filename, opt);
+
+    keepWrite(callback);
+    function keepWrite(callback) {
+        var ok = writeStream.write(buf, Constants.CODING, callback);
+        if (!ok)
+            writeStream.once('drain', keepWrite());
+    }
+}
+
+StorageManaer.writeJSONSync = function (filename, buf, callback) {
+    fs.writeFileSync(filename,buf,Constants.CODING);
+}
+
+/**
+ * Safely read file to JSON string
+ *
+ * @param {any} filename --file path
+ * @param {any} buffer --written file
+ * @param {any} offset --start page in the buffer
+ * @param {any} position --start page in the file
+ *
+ * @param {any} callback
+ */
+StorageManaer.readJSON = function (filename, callback) {
+    fs.access(filename,fs.constants.R_OK, (err)=>{
+        if(err) throw err;
+    });
+    return fs.readFileSync(filename,Constants.CODING);
+}
+
+
 
 
 /**

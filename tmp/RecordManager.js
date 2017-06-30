@@ -17,8 +17,7 @@ var Page = require('../BM/Page'),
     BufferPool = require('../BM/BM_BufferPool'),
     fs = require('fs'),
     Catalog = require('./Catalog'),
-    TablePool = require('./TablePool'),
-    Stack = require('../Stack');
+    TablePool = require('./TablePool');
 
 var workdir = Constants.workdir;
 
@@ -146,14 +145,14 @@ RecordManager.insertRecord = function (table, record) {
         lastRecordOffset = Constants.PAGE_SIZE;
     }
     else
-        lastRecordOffset = buf.readInt16BE(lrid.slot * Constants.slotSize);
+        lastRecordOffset = buf.readInt16BE(table.getLastRIDIndex());
 
     var freeSpace = 0;
 
     if (lrid.slot == 0)
         freeSpace = Constants.PAGE_SIZE;
     else
-        freeSpace = lastRecordOffset - (lrid.slot * Constants.slotSize) - Constants.slotSize + 1;
+        freeSpace = lastRecordOffset - table.getLastRIDIndex() - Constants.slotSize + 1;
 
 //find the next slot for the record
     if (freeSpace < table.schema.getSize()) {//need one more page && !(table.lastRID.page == 0 && table.lastRID.slot == 0)
@@ -174,7 +173,7 @@ RecordManager.insertRecord = function (table, record) {
 //start to write
     var recordOffset = lastRecordOffset - table.schema.getSize();
     record.id = table.lastRID;
-    buf.writeInt16BE(recordOffset, lrid.slot * Constants.slotSize);//write slot
+    buf.writeInt16BE(recordOffset, table.getLastRIDIndex());//write slot
     writeRecord(buf.slice(recordOffset, lastRecordOffset), table.schema, record);//write record
 
     table.increaseTuple();
@@ -197,7 +196,7 @@ RecordManager.deleteRecord = function (table, id) {
     var buf = page.sliceBuffer(table.bp.data);
     var offset;
     if ((offset = buf.readInt16BE(id.getSlotIndex())) < Constants.PAGE_SIZE) {
-        var oRecord = buf.slice(offset, offset + table.schema.getSize());
+        var oRecord = buf.slice(offset, offset + table.getTupleSize());
         resetRecord(oRecord);
     } else {
 
@@ -219,17 +218,14 @@ RecordManager.updateRecord = function (table, record) {
     var page = new Page(record.id.page);
     bm.pinPage(table.bp, page);
     var buf = page.sliceBuffer(table.bp.data);//last page buf
+    var offset;
 
-    //if there is data, still over write it.
-
-    if(table.schema.maxSlot() >= record.id.slot){//if too large, do nothing
-        var rsize = table.schema.getSize();
-        var offset = Constants.PAGE_SIZE - (record.id.slot+1)*rsize;//offset for record
-        buf.writeInt16BE(offset, record.id.getSlotIndex());//write slot
-        writeRecord(buf.slice(offset, offset + rsize),
+    if ((offset = buf.readInt16BE(record.id.getSlotIndex())) < Constants.PAGE_SIZE) {
+        var oRecord = buf.slice(offset, offset + table.getTupleSize());
+        writeRecord(oRecord,
             table.schema,
             record);
-    }else {
+    } else {
         throw new DBErrors('Record offset out of boundary!');
     }
 
@@ -251,7 +247,7 @@ RecordManager.getRecord = function (table, id, record) {
     var offset;
 
     if ((offset = buf.readInt16BE(id.getSlotIndex())) < Constants.PAGE_SIZE) {
-        var oRecord = buf.slice(offset, offset + table.schema.getSize());
+        var oRecord = buf.slice(offset, offset + table.getTupleSize());
         readRecord(oRecord, table.schema, record);
     } else {
         throw new DBError('Record offset out of boundary!');
@@ -292,7 +288,7 @@ RecordManager.getRecordSize = function (schema) {
  * @param keys
  * @returns {Schema}
  */
-RecordManager.createSchema = function (numAttr, attrNames, dataTypes, typeLength, keySize, keys, schemaName) {
+RecordManager.createSchema = function (numAttr, attrNames, dataTypes, typeLength, keySize, keys,schemaName) {
     "use strict";
     if (attrNames.length == dataTypes.length && dataTypes.length == typeLength.length)
         return new Schema(numAttr, attrNames, dataTypes, typeLength, keySize, keys, schemaName);
@@ -404,50 +400,11 @@ function writeRecord(buf, schema, record) {
                 if (record.data[i].length > length) {
                     throw new DBError('Insert data is out of boundary!')
                 }
-                //buf.write(record.data[i].toString(), curs, length, Constants.CODING);
-                switch(schema.dataTypes[i]){
-                    case Schema.Datatype.DT_INT:
-                        writeInt(buf.slice(curs,curs+length),record.data[i], length);
-                        break;
-                    case Schema.Datatype.DT_BOOL:
-                        writeBoolean(buf.slice(curs,curs+length),record.data[i]);
-                        break;
-                    case Schema.Datatype.DT_STRING:
-                        writeString(buf.slice(curs,curs+length),record.data[i]);
-                        break;
-                    case Schema.Datatype.DT_FLOAT:
-                        writeFloat(buf.slice(curs,curs+length),record.data[i]);
-                        break;
-
-                }
+                buf.write(record.data[i].toString(), curs, length, Constants.CODING);
                 curs += (length);
             }
         }
     }
-}
-
-function writeString(buf, data) {
-    "use strict";
-    buf.fill(0);
-    buf.write(data, Constants.CODING);
-}
-
-function writeInt(buf, data, length)  {
-    "use strict";
-    return buf.writeIntBE(data, 0, length);
-}
-
-function writeFloat(buf, data)  {
-    "use strict";
-    return buf.writeFloatBE(data, 0);
-}
-
-function writeBoolean(buf, data) {
-    "use strict";
-    var val;
-    if (data == true) val =  1;
-    else val = 0;
-    buf.writeInt8(data);
 }
 
 /**
@@ -470,50 +427,10 @@ function readRecord(buf, schema, record) {
         var curs = 9;
         for (var i = 0; i < schema.numAttr; i++) {
             var length = schema.typeLength[i];
-            switch (schema.dataTypes[i]) {
-                case Schema.Datatype.DT_INT:
-                    record.data[i] = readInt(length, buf.slice(curs, curs+length), record.data[i]);
-                    break;
-                case Schema.Datatype.DT_BOOL:
-                    record.data[i] = readBoolean(length, buf.slice(curs, curs+length), record.data[i]);
-                    break;
-                case Schema.Datatype.DT_STRING:
-                    record.data[i] = readString(length, buf.slice(curs, curs+length));
-                    break;
-                case Schema.Datatype.DT_FLOAT:
-                    record.data[i] = readFloat(length, buf.slice(curs, curs+length), record.data[i])
-                    break;
-
-            }
+            record.data[i] = buf.toString(Constants.CODING, curs, curs + length - 1);
             curs += length;
         }
     }
-}
-
-function readString(length, buf) {
-    "use strict";
-    var j;
-    for ( j = 0; j < length; j++) {
-        if (buf[j] == 0)
-            break;
-    }
-   return buf.toString(Constants.CODING,0,j);
-}
-
-function readInt(length, buf) {
-    "use strict";
-    return  buf.readIntBE(0, length);
-}
-
-function readFloat(length, buf) {
-    "use strict";
-    return buf.readFloatBE(0);
-}
-
-function readBoolean(length, buf) {
-    "use strict";
-    if (buf.readInt8() == 0) return false;
-    else return true;
 }
 
 /**
