@@ -11,7 +11,7 @@ var ts = require('./TestHelper');
 
 var sleep = require('sleep')
     , File = require('../src/BM/File')
-    , util = require('../src/util')
+    , util = require('../src/util/util')
     , fs = require('fs');
 
 

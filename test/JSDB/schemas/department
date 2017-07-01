@@ -1,1 +1,0 @@
-{"numAttr":4,"attrNames":["did","name","salary","isBig"],"dataTypes":["0","1","0","3"],"typeLength":[8,8,4,4],"keyAttrs":1,"keySize":[1,0,0,0],"tableName":"department","size":33}

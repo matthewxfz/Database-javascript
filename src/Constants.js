@@ -2,7 +2,7 @@
  * Created by matthewxfz on 6/26/17.
  */
 var Constants = {
-    workdir:'/Users/matthewxfz/Workspaces/gits/Database-javascript/test',
+    workdir:__dirname,
     //sm
     PAGE_SIZE:4096,
     CODING:'utf8',

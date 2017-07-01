@@ -5,7 +5,7 @@
 var Table = require('./Table'),
     fs = require('fs'),
     sm = require('../SM/StorageManager'),
-    Queue = require('../Queue');
+    Queue = require('../util/Queue');
 var Constants = require('../Constants');
 
 

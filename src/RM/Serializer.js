@@ -1,7 +1,7 @@
 'use strict'
-const tb = require('../src/Table.js'),
+const tb = require('../Table.js'),
       Serializer = {},
-      Value = require('../src/ValueHelper');
+      Value = require('../ValueHelper');
 // const RecordManager = require('../src/RecordManager.js');
 // var tb = new Table();
 // var rm = new RecordManager();

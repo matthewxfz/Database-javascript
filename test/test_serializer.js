@@ -4,7 +4,7 @@ var tb = require('../src/Table.js'),
     RM_TableData = require('../src/RM_TableData'),
     Schema = require('../src/Schema'),
     Value = require('../src/ValueHelper'),
-    rms = require('../src/rm_serializer');
+    rms = require('../src/RM/Serializer');
     assert = require('assert');
 
 describe('Functionality Test',function() {

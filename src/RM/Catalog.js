@@ -4,9 +4,9 @@
 var BufferPool = require('../BM/BM_BufferPool'),
     Schema = require('./Schema'),
     Record = require('./Record'),
-    Queue = require('../Queue'),
+    Queue = require('../util/Queue'),
     Page = require('../BM/Page'),
-    Stack = require('../Stack'),
+    Stack = require('../util/Stack'),
     sleep = require('sleep');
 
 var fs = require('fs'),

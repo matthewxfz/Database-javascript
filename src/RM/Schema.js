@@ -24,12 +24,9 @@ function Schema(numAttr, attrNames, datatypes, typeLength, keyAttrs, keySize, ta
     this.tableName = tableName;
     this.size = 0;
     if (this.typeLength)
-        for (var i = 0; i < this.typeLength.length; i++) {
-            this.size += this.typeLength[i];
-        }
+        this.updateSize();
     else
-        this.size = 0;
-    this.size += Constants.RID + 1;//1 for isNUll
+        this.size += Constants.RID + 1;//1 for isNUll
 }
 
 Schema.Datatype = {
@@ -46,7 +43,8 @@ Schema.prototype.getSize = function () {
 
 Schema.prototype.updateSize = function () {
     "use strict";
-    for (var i=0;i<this.typeLength.length;i++) {
+    this.size = 0;
+    for (var i = 0; i < this.typeLength.length; i++) {
         this.size += this.typeLength[i];
     }
     this.size += Constants.RID + 1;//1 for isNUll
@@ -70,10 +68,10 @@ Schema.prototype.upateFromJSON = function (json) {
     this.updateSize();
 }
 
-Schema.prototype.maxSlot = function(){
+Schema.prototype.maxSlot = function () {
     "use strict";
     var rs = this.getSize();
-    return (Constants.PAGE_SIZE)/(rs+Constants.slotSize);
+    return (Constants.PAGE_SIZE) / (rs + Constants.slotSize);
 }
 
 module.exports = Schema;

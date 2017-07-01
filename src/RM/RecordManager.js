@@ -17,7 +17,7 @@ var Page = require('../BM/Page'),
     fs = require('fs'),
     TablePool = require('./TablePool'),
     Catalog = require('./Catalog'),
-    Stack = require('../Stack');
+    Stack = require('../util/Stack');
 
 var workdir = Constants.workdir;
 
@@ -425,9 +425,7 @@ function writeRecord(buf, schema, record) {
             var curs = 9;
             for (var i = 0; i < schema.numAttr; i++) {
                 var length = schema.typeLength[i];
-                if (record.data[i].length > length) {
-                    throw new DBError('Insert data is out of boundary!')
-                }
+
                 //buf.write(record.data[i].toString(), curs, length, Constants.CODING);
                 switch (schema.dataTypes[i]) {
                     case Schema.Datatype.DT_INT:
@@ -453,6 +451,9 @@ function writeRecord(buf, schema, record) {
 function writeString(buf, data) {
     "use strict";
     buf.fill(0);
+    if (data.length > buf.length) {
+        throw new DBErrors('Insert data is out of boundary!')
+    }
     buf.write(data, Constants.CODING);
 }
 

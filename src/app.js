@@ -3,10 +3,10 @@ var sm = require('./SM/StorageManager'),
     rm = require('./RM/RecordManager'),
     fs = require('fs'),
     File = require('./BM/File'),
-    util = require('./util'),
+    util = require('./util/util'),
     assert = require('assert'),
     BMQueue = require('./BM/BMQueue'),
-    Queue = require('./Queue'),
+    Queue = require('./util/Queue'),
     TestHelper = require('../test/TestHelper'),
     Constants = require('./Constants'),
     CatalogM = require('./RM/CatalogManager'),
@@ -15,7 +15,7 @@ var sm = require('./SM/StorageManager'),
     Record = require('./RM/Record'),
     sleep = require('sleep'),
     Page = require('./BM/Page'),
-    Iterator = require('./Iterator');
+    Iterator = require('./util/Iterator');
 
 var ts = require('../test/TestHelper');
 
@@ -40,10 +40,6 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
     this.mgmtData = mgmtData;
 }
 testTableWholeFunction();
-//testCatalog();
-
-// sm.readBlockSync('/Users/matthewxfz/Workspaces/gits/Database-javascript/test/JSDB/catalog',buf, 0);
-// consoel.log(buf.toString());
 
 function testTableWholeFunction() {
 

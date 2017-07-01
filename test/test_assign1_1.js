@@ -7,7 +7,7 @@ const assert = require('assert')
 
 var sleep = require('sleep')
     , File = require('../src/BM/File')
-    , util = require('../src/util')
+    , util = require('../src/util/util')
     , fs = require('fs');
 
 describe('Test for Storage Manager', () => {
