@@ -175,7 +175,7 @@ StorageManaer.readBlockSync = function (path, buf, pageNum) {
     }catch(err){
         if(err.code == 'ENOENT')
         {
-            fd = fs.openSync(path,'w+');
+            fd = fs.openSync(path,'wx+');
         }else{
             if(err) throw err;
         }

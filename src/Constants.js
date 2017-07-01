@@ -2,7 +2,7 @@
  * Created by matthewxfz on 6/26/17.
  */
 var Constants = {
-    workdir:__dirname,
+    workdir:__dirname.substr(0,__dirname.length-4),
     //sm
     PAGE_SIZE:4096,
     CODING:'utf8',

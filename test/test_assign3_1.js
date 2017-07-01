@@ -25,18 +25,19 @@ describe('Test cases for Record Manager', () => {
     rm.initRecordManager();
 
     function CleanEnv() {
-        deleteFile('table1');
-        deleteFile('table2');
-        deleteFile('table3');
-        deleteFile('testScan');
-        fs.unlink(Constants.workdir + Constants.catalog);
+        deleteSchemaAndTable('table1');
+        deleteSchemaAndTable('testScan');
+        deleteFile(Constants.workdir+Constants.catalog);
     }
 
-    function deleteFile(tablename) {
+    function deleteSchemaAndTable(tablename) {
+        deleteFile(Constants.workdir + Constants.tablesdir + tablename);
+        deleteFile(Constants.workdir + Constants.schemasdir + tablename);
+    }
+    function deleteFile(path){
         try {
-            fs.accessSync(Constants.workdir + Constants.tablesdir + tablename);
-            fs.unlink(Constants.workdir + Constants.tablesdir + tablename);
-            fs.unlink(Constants.workdir + Constants.schemasdir + tablename);
+            fs.accessSync(path);
+            fs.unlink(path);
         } catch (err) {
             if (err.code == 'ENOENT') {
                 //do nothing

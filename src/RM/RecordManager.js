@@ -281,18 +281,6 @@ RecordManager.getRecord = function (table, id, record) {
 };
 
 
-//Scan function is implemented in the Scan object
-// RecordManager.startScan = function (table, scan, cond) {
-//     "use strict";
-//
-// };
-// RecordManager.next = function (scan, record) {
-// };
-// RecordManager.closeScan = function (scan) {
-// };
-
-//dealing with schema
-
 RecordManager.getRecordSize = function (schema) {
     "use strict";
     var result = 0;
@@ -367,24 +355,31 @@ function fillEmptySlots(page) {
 /**
  * Check if the env for bm is ready?
  */
-function checkEnv() {
-    checkDir(workdir + Constants.rootdir, (err) => {
-        checkDir(workdir + Constants.schemasdir);
-        checkDir(workdir + Constants.tablesdir);
-        checkDir(workdir + Constants.index);
-        checkDir(workdir + Constants.viewsdir);
-    });
+function checkEnv(cb) {
+    checkDirSync(workdir + Constants.rootdir);
+    checkDirSync(workdir + Constants.schemasdir);
+    checkDirSync(workdir + Constants.tablesdir);
+    checkDirSync(workdir + Constants.index);
+    checkDirSync(workdir + Constants.viewsdir);
 }
 
-
-function checkDir(dir, cb) {
-    fs.access(dir, fs.constants.W_OK | fs.constants.R_OK, (err) => {
+function checkDirSync(dir) {
+    try{
+        fs.accessSync(dir, fs.constants.W_OK | fs.constants.R_OK);
+    }catch (err){
         if (err != undefined && err.code == 'ENOENT')
-            fs.mkdir(dir, 0o744, cb);
-        else if (cb) cb(err);
-
-    })
+            fs.mkdirSync(dir, 0o744);
+    }
 }
+
+// function checkDir(dir, cb) {
+//     fs.access(dir, fs.constants.W_OK | fs.constants.R_OK, (err) => {
+//         if (err != undefined && err.code == 'ENOENT')
+//             fs.mkdir(dir, 0o744, cb);
+//         else if (cb) cb(err);
+//
+//     })
+// }
 
 //layout manager
 function getTableAccess(tableName) {
