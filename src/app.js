@@ -13,6 +13,8 @@ var sm = require('./SM/StorageManager'),
     Catalog = require('./RM/Catalog'),
     Schema = require('./RM/Schema'),
     Record = require('./RM/Record'),
+    sleep = require('sleep'),
+    Page = require('./BM/Page'),
     Iterator = require('./Iterator');
 
 var ts = require('../test/TestHelper');
@@ -37,23 +39,12 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
     this.strategy = strategy;
     this.mgmtData = mgmtData;
 }
-testCatalog();
+testTableWholeFunction();
+//testCatalog();
 
+// sm.readBlockSync('/Users/matthewxfz/Workspaces/gits/Database-javascript/test/JSDB/catalog',buf, 0);
+// consoel.log(buf.toString());
 
-function testCatalog(){
-    CatalogM.init();
-    CatalogM.add('student');
-    CatalogM.add('teacher');
-    CatalogM.add('class');
-    CatalogM.add('registerTo');
-    CatalogM.add('department');
-    CatalogM.remove(('student'));
-    var tablinfo = new Catalog.TableInfo(new Record.RID(0,10),'class', 12);
-    CatalogM.update(tablinfo);
-    var record = CatalogM.find('class');
-    console.log(JSON.stringify(record));
-    CatalogM.shutdown();
-}
 function testTableWholeFunction() {
 
     rm.initRecordManager();
@@ -64,13 +55,54 @@ function testTableWholeFunction() {
             1,
             [1, 0, 0, 0],
             'student'));
-    rm.insertRecord('studnet',new Record('',0,['Xiong','iit',10,1]));
-    rm.insertRecord('studnet',new Record('',0,['Yan','iit',10,1]));
-    rm.insertRecord('studnet',new Record('',0,['Lee','iit',10,1]));
-    rm.insertRecord('studnet',new Record('',0,['Sync','iit',10,1]));
-    rm.insertRecord('studnet',new Record('',0,['Liang','iit',10,1]));
+    rm.createTable('department',
+        rm.createSchema(4, ['did', 'name', 'salary', 'isBig'],
+            [Schema.Datatype.DT_INT, Schema.Datatype.DT_STRING, Schema.Datatype.DT_INT, Schema.Datatype.DT_BOOL],
+            [8, 8, 4, 4],
+            1,
+            [1, 0, 0, 0],
+            'department'));
+    rm.createTable('school',
+        rm.createSchema(4, ['sid', 'name', 'studnet', 'isClosed'],
+            [Schema.Datatype.DT_INT, Schema.Datatype.DT_STRING, Schema.Datatype.DT_INT, Schema.Datatype.DT_BOOL],
+            [8, 8, 4, 4],
+            1,
+            [1, 0, 0, 0],
+            'school'));
+
+    rm.openTable('student');
+    var students = rm.getTableByName('student');
+    rm.insertRecord(students,new Record('',0,['Xiong','iit',10,1]));
+    rm.insertRecord(students,new Record('',0,['Yan','iit',10,1]));
+    rm.insertRecord(students,new Record('',0,['Lee','iit',10,1]));
+    rm.insertRecord(students,new Record('',0,['Sync','iit',10,1]));
+    rm.insertRecord(students,new Record('',0,['Liang','iit',10,1]));
+
+    rm.closeTable(students);
+
+    rm.shutdownRecordManager();
+
 
 }
+function testCatalog(){
+    CatalogM.init();
+
+    CatalogM.add('teacher');
+    CatalogM.add('student');
+    CatalogM.add('registerTo');
+    CatalogM.add('class');
+    CatalogM.add('department');
+    CatalogM.add('badfdslfjaksldfjlasdjflksaj');
+    //CatalogM.add('hellow rold');
+    //CatalogM.remove('student');
+    //var tablinfo = new Catalog.TableInfo(new Record.RID(0,10),'class', 12);
+    //CatalogM.update(tablinfo);
+    //var record = CatalogM.find('teacher');
+    //console.log(JSON.stringify(record));
+    CatalogM.scanAllTheRecords();
+    CatalogM.shutdown();
+}
+
 
 function testTablesWithCatalogInBP() {
     var schema = new Schema(4, ['attriName', 'dataType', 'typeLength', 'isKey'],

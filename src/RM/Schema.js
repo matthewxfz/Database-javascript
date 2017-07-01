@@ -46,8 +46,8 @@ Schema.prototype.getSize = function () {
 
 Schema.prototype.updateSize = function () {
     "use strict";
-    for (var l in this.typeLength) {
-        this.size += l;
+    for (var i=0;i<this.typeLength.length;i++) {
+        this.size += this.typeLength[i];
     }
     this.size += Constants.RID + 1;//1 for isNUll
     return this.size;

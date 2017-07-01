@@ -6,7 +6,8 @@ var BufferPool = require('../BM/BM_BufferPool'),
     Record = require('./Record'),
     Queue = require('../Queue'),
     Page = require('../BM/Page'),
-    Stack = require('../Stack');
+    Stack = require('../Stack'),
+    sleep = require('sleep');
 
 var fs = require('fs'),
     sm = require('../SM/StorageManager'),
@@ -15,7 +16,7 @@ var fs = require('fs'),
 var rm_catalog = require('./RecordManager');
 
 var Constants = require('../Constants');
-function Catalog(){
+function Catalog() {
     "use strict";
     var tableName = Constants.catalog.split('/')[2];
     var schema = new Schema(2, ['tableName', 'numberOfTuple'],
@@ -31,7 +32,7 @@ function Catalog(){
     this.bp = bp;
     this.tableName = tableName;
     bm.initBufferPool(this.bp);
-    this.lastRID = creatLastRID(this.bp, this.schema);
+    this.lastRID = this.getLastRID(this.bp, this.schema);
 
 
     //update data from file
@@ -53,12 +54,12 @@ var TableInfo = function (rid, tableName, numTuple) {
     this.tableName = tableName;
     this.numberOfTuple = numTuple;
 }
-Catalog.prototype.increaseTuple = function(){
+Catalog.prototype.increaseTuple = function () {
     "use strict";
     this.numTable++;
 }
 
-Catalog.prototype.decreaseTuple = function(){
+Catalog.prototype.decreaseTuple = function () {
     "use strict";
     this.numTable--;
 }
@@ -67,35 +68,35 @@ Catalog.prototype.decreaseTuple = function(){
  * @param {tableInfo}data
  * @returns {Record}
  */
-Catalog.prototype.getRecord  = function(data) {
+Catalog.prototype.getRecord = function (data) {
     "use strict";
     return new Record(data.RID, 0, [data.tableName, data.numberOfTuple])
 }
 
-Catalog.prototype.getNode = function(record) {
+Catalog.prototype.getData = function (record) {
     "use strict";
-    return;
+    return new TableInfo(record.id, record.data[0], record.data[1]);
 }
-Catalog.prototype.add = function (tableName) {
+Catalog.prototype.add = function (tableName, numTuple) {
     "use strict";
-    var data = new TableInfo(findAvailableRID(this.tableInfos,this.schema), tableName, 0);
+    var data = new TableInfo(findAvailableRID(this.tableInfos, this.schema), tableName, numTuple);
     this.tableInfos.push(data);
     return data;
 }
 
-function findAvailableRID(tableInfos,schema){
+function findAvailableRID(tableInfos, schema) {
     "use strict";
     var node = tableInfos.peek();
-    if(node == null)
-        return new Record.RID(0,1);
-    else{
+    if (node == null)
+        return new Record.RID(0, 1);
+    else {
         var oRID = node.RID;
         var nRID = new Record.RID(oRID.page, oRID.slot);
         var maxslot = schema.maxSlot();
-        if(nRID.slot == maxslot){
+        if (nRID.slot == maxslot) {
             nRID.page++;
             nRID.slot = 0;
-        }else{
+        } else {
             nRID.slot++;
         }
         return nRID;
@@ -120,10 +121,10 @@ Catalog.prototype.search = function (tableName) {
     return null;
 }
 
-Catalog.prototype.update = function (tableName,data) {
+Catalog.prototype.update = function (tableName, data) {
     "use strict";
     var node = this.search(tableName);
-    if(node != null)
+    if (node != null)
         node.data = data;
 };
 
@@ -152,10 +153,37 @@ Catalog.prototype.updateLastRID = function (rid) {
     bm.unpinPage(this.bp, page);
 }
 
+/**
+ * get the RID from the buffer pool
+ * @param {BufferPool} bp of the table
+ */
+Catalog.prototype.getLastRID = function () {
+    "use strict";
+    var page = new Page(0);
+    var rid = new Record.RID();
+    bm.pinPage(this.bp, page);
+    var buf = page.sliceBuffer(this.bp.data)
+
+
+    var offset = (buf).readInt16BE(0);
+
+    if (offset == 0) {
+        rid = creatLastRID(this.bp, this.schema);
+    }
+    else {
+        rid.page = buf.readInt32BE(offset);
+        rid.slot = buf.readInt32BE(offset + Constants.RID / 2);
+    }
+
+    bm.unpinPage(this.bp, page);
+    return rid;
+}
+
+
 function creatLastRID(bp, schema) {
 
     "use strict";
-    var rid = new Record.RID(0,0);
+    var rid = new Record.RID(0, 0);
     var page = new Page(0);
     bm.pinPage(bp, page);
     var pageBuf = page.sliceBuffer(bp.data);
@@ -168,34 +196,10 @@ function creatLastRID(bp, schema) {
     return rid;
 }
 
-/**
-  * get the RID from the buffer pool
-  * @param {BufferPool} bp of the table
-  */
-Catalog.prototype.getLastRID = function() {
+
+Catalog.getLastRIDIndex = function (rid) {
     "use strict";
-    var page = new Page(0);
-    var rid = new Record.RID();
-    bm.pinPage(this.bp, page);
-
-    var offset = (page.sliceBuffer(this.bp.data)).readInt16BE(0);
-
-    if (offset == 0) {
-        rid.page = 0;
-        rid.slot = 0;
-    }
-    else {
-        rid.page = page.sliceBuffer(this.bp.data).readInt32BE(offset);
-        rid.slot = page.sliceBuffer(this.bp.data).readInt32BE(offset + Constants.RID / 2);
-    }
-
-    bm.unpinPage(this.bp, page);
-    return rid;
-}
-
-Catalog.getLastRIDIndex = function(rid){
-    "use strict";
-    return rid.slot*Constants.slotSize;
+    return rid.slot * Constants.slotSize;
 }
 
 

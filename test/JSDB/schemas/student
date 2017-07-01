@@ -1,0 +1,1 @@
+{"numAttr":4,"attrNames":["name","school","age","isFool"],"dataTypes":["1","1","0","3"],"typeLength":[8,8,4,4],"keyAttrs":1,"keySize":[1,0,0,0],"tableName":"student","size":33}

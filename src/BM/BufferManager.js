@@ -7,7 +7,8 @@ const DBErrors = require('../DBErrors'),
     fs = require('fs'),
     assert = require('assert'),
     sm = require('../SM/StorageManager'),
-    EventEmitter = require('events');
+    EventEmitter = require('events'),
+    Constants = require('../Constants');
 ;
 
 var locks = require('locks');
@@ -76,7 +77,6 @@ BM_BufferPool.toString = function () {
  * @param {ReplacementStrategy} strategy
  */
 BufferManager.initBufferPool = function (bp, pageFileName, numPages, strategy) {
-    var fd;
     try {
         if (pageFileName)
             bp.pageFile = pageFileName;
@@ -84,8 +84,6 @@ BufferManager.initBufferPool = function (bp, pageFileName, numPages, strategy) {
             bp.numPages = numPages;
         if (strategy)
             bp.strategy = strategy;
-
-        fd = fs.openSync(bp.pageFile, 'w+');
 
         bp.queueLength = 0;
         bp.readBlocksNum = 0;
@@ -214,23 +212,24 @@ BufferManager.unpinPage = function (bp, page) {
  * @param {any} bp
  * @param {BM_PageHandle} page - page in the file
  */
-BufferManager.pinPage = function (bp, page, pageNum) {
+BufferManager.pinPage = function (bp, page, pageNum, cb) {
     switch (bp.strategy) {
         case 0:
-            FIFO_pinPage(bp, page);
+            FIFO_pinPage(bp, page, cb);
             break;
         case 1:
-            LRU_pinPage(bp, page);
+            LRU_pinPage(bp, page, cb);
             break;
         case 2:
-            CLOCK_pinPage(bp, page);
+            CLOCK_pinPage(bp, page, cb);
             break;
         default:
+            FIFO_pinPage(bp, page, cb);
     }
 }
 
 
-function FIFO_pinPage(bp, page) {
+function FIFO_pinPage(bp, page, cb) {
     if (bp.queue == undefined) {
         throw Error('The FIFO queue is not defined!');
     }
@@ -238,11 +237,14 @@ function FIFO_pinPage(bp, page) {
     if (memPage !== null) {// the page is in the buffer pool
         page.data = memPage;
         bp.fixcount[page.data]++;
+        if(cb)  cb(null, page.sliceBuffer(page.data));
         return true;
     } else {//the file page is not in the buffer pool
         page.data = getAvailableFrame_FIFO(bp);// find a page to replace
-        if (page.data == null)
+        if (page.data == null) {
+            if (cb) cb(new DBErrors('there is no page right now!'), null);
             return false;
+        }
         // throw new DBErrors('No page in buffer is available right now!',
         //     DBErrors.type.RC_BM_NO_BUFFER_AVAILBLE);
         else {
@@ -261,6 +263,7 @@ function FIFO_pinPage(bp, page) {
 
             bp.storage_page_map[page.data] = page.pageNum;
             bp.queue.push(page.data);
+            if(cb)  cb(null, page.sliceBuffer(page.data));
             return true;
         }
     }
@@ -312,13 +315,14 @@ function CLOCK_pinPage(bp, page) {
 
 
 function readOnePage(bp, page) {
-    sm.safeReadBlock(bp.pageFile, bp.data, page.data, page.pageNum, (err, buf) => {
-        if (err) {
-            bp.fixcount[page.data]--;
-            throw err;
-        }
-        //console.log('pin data'+bp.data.toString('utf8'));
-    });
+    sm.readBlockSync(bp.pageFile,page.sliceBuffer(bp.data), page.pageNum);
+    // sm.safeReadBlock(bp.pageFile, bp.data, page.data, page.pageNum, (err, buf) => {
+    //     if (err) {
+    //         bp.fixcount[page.data]--;
+    //         throw err;
+    //     }
+    //     //console.log('pin data'+bp.data.toString('utf8'));
+    // });
 }
 
 

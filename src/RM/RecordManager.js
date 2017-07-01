@@ -11,13 +11,12 @@ var Page = require('../BM/Page'),
     DBErrors = require('../DBErrors'),
     Record = require('./Record'),
     Table = require('./Table'),
-    Scan = require('./RM_ScanHandle'),
     Schema = require('./Schema'),
     Constants = require('../Constants'),
     BufferPool = require('../BM/BM_BufferPool'),
     fs = require('fs'),
-    Catalog = require('./Catalog'),
     TablePool = require('./TablePool'),
+    Catalog = require('./Catalog'),
     Stack = require('../Stack');
 
 var workdir = Constants.workdir;
@@ -30,9 +29,9 @@ var workdir = Constants.workdir;
  * @param tableSchema
  * @param tableIndex
  */
-var catalog;
 var tablePool;
-
+var catalog;
+var CatalogManager = {};
 
 /**
  * Check env
@@ -44,7 +43,7 @@ RecordManager.initRecordManager = function (dicBp) {
     //check Env
     checkEnv();
     //read catalog
-    catalog = new Catalog();
+    CatalogManager.init()
     tablePool = new TablePool();
 }
 
@@ -55,13 +54,13 @@ RecordManager.initRecordManager = function (dicBp) {
 RecordManager.shutdownRecordManager = function () {
     "use strict";
 
-    for (var table in tablePool.tables) {
-        //update table
-        //update schema
-        //close bp
+    CatalogManager.shutdown();
+
+    var ite = tablePool.tables.iterator();
+    while (ite.hasNext()) {
+        var table = ite.next();
         this.closeTable(table);
     }
-    catalog.update();
 }
 /**
  * Create Schema file
@@ -72,17 +71,17 @@ RecordManager.shutdownRecordManager = function () {
  * @param schema
  */
 RecordManager.createTable = function (tableName, schema) {
-    //create empty schema file
-    sm.writeJSON(schema.getdir(), JSON.stringify(schema));
+    if (CatalogManager.find(tableName) == null) {
+        //create empty schema file
+        sm.writeJSON(schema.getdir(), JSON.stringify(schema));
 
-    //create table in memory
-    var table = new Table(tableName, schema,
-        new BufferPool(Constants.workdir + Constants.tablesdir + tableName, Constants.defaultBPSize, Constants.defaultStra));
-    //registering in the catalog
-    catalog.add(tableName);
-    catalog.update();
-    //create table file
-    table.updateLastRID(new Record.RID(0, 0));
+        //create table in memory
+        var table = new Table(tableName, schema);
+        //registering in the catalog
+        CatalogManager.add(tableName, 0);
+        //write to file
+        table.shutdown();
+    }
 }
 /**
  * Find the table information of the table
@@ -90,44 +89,64 @@ RecordManager.createTable = function (tableName, schema) {
  * Read the table bp
  * @param {RM_TableData}table
  * @param {String}tableName
+ * @return table
  */
-RecordManager.openTable = function (table, tableName) {
+RecordManager.openTable = function (tableName) {
     "use strict";
     //dictionary change
-    table = tablePool.search(tableName);
-    if (table == null) {
+    var table = tablePool.search(tableName);
+    if (table == null) {// no such table opened before, open one
         var schema = getSchemaFromFile(tableName);
-        table = new Table(tableName, schema,
-            new BufferPool(Constants.workdir + Constants.tablesdir + tableName, Constants.defaultBPSize, Constants.defaultStra));
-        tablePool.tables.push(table);
+        table = new Table(tableName,
+            schema);
+
+        table.numberOfTuple = CatalogManager.find(table.name).numberOfTuple;
+        tablePool.add(table);
     }
+    return table;
 }
 
-RecordManager.closeTable = function (table) {
+RecordManager.closeTable = function (tableName) {
     "use strict";
-    catalog.update(table);
-    tablePool.remove(table);
-    bm.shutdownBufferPool(table.bp);
+    var table;
+    //update the tuple information CatalogManager.update()
+    if (typeof tableName == 'string')
+        table = tablePool.search(tableName);
+    else
+        table = tableName;
+    if (table != null) {
+        tablePool.remove(table);
+        bm.shutdownBufferPool(table.bp);
+    }
 }
 RecordManager.deleteTable = function (tableName) {
     "use strict";
     var table = tablePool.search(tableName);
-    if (tablePool != null)
+    if (table != null)
         this.closeTable(table);
     //delete table file
     sm.destroyFile(Catalog.getTableAccess(tableName))
     //delete schema file
     sm.destroyFile(Catalog.getSchemaAccess(tableName));
     //delete from catalog
-    catalog.remove(tableName);
-    catalog.update();
+    CatalogManager.remove(tableName);
 }
-RecordManager.getNumTuple = function (table) {
+
+RecordManager.getNumTuple = function (tableName) {
     "use strict";
+    var table = tablePool.search(tableName);
+    if (tablePool == null) {
+        return CatalogManager.find(tableName).numberOfTuple;
+    }
     return table.numberOfTuple;
 };
 
 
+RecordManager.getTableByName = function (tableName) {
+    var table = tablePool.search(tableName);
+    if (table == null) return null;
+    else return table;
+}
 //Handling records in the table
 /**
  * Insert the record to the end of the file
@@ -141,9 +160,9 @@ RecordManager.insertRecord = function (table, record) {
 
     bm.pinPage(table.bp, page);
     var buf = page.sliceBuffer(table.bp.data);//last page buf
-    var lastRecordOffset
+    var lastRecordOffset;
     if ((lrid.page == 0 && lrid.slot == 0)) {
-        lastRecordOffset = Constants.PAGE_SIZE;
+        lastRecordOffset = Constants.PAGE_SIZE - table.schema.getSize();
     }
     else
         lastRecordOffset = buf.readInt16BE(lrid.slot * Constants.slotSize);
@@ -171,7 +190,7 @@ RecordManager.insertRecord = function (table, record) {
     }
     table.updateLastRID(lrid);
 
-//start to write
+    //start to write
     var recordOffset = lastRecordOffset - table.schema.getSize();
     record.id = table.lastRID;
     buf.writeInt16BE(recordOffset, lrid.slot * Constants.slotSize);//write slot
@@ -222,14 +241,14 @@ RecordManager.updateRecord = function (table, record) {
 
     //if there is data, still over write it.
 
-    if(table.schema.maxSlot() >= record.id.slot){//if too large, do nothing
+    if (table.schema.maxSlot() >= record.id.slot) {//if too large, do nothing
         var rsize = table.schema.getSize();
-        var offset = Constants.PAGE_SIZE - (record.id.slot+1)*rsize;//offset for record
+        var offset = Constants.PAGE_SIZE - (record.id.slot + 1) * rsize;//offset for record
         buf.writeInt16BE(offset, record.id.getSlotIndex());//write slot
         writeRecord(buf.slice(offset, offset + rsize),
             table.schema,
             record);
-    }else {
+    } else {
         throw new DBErrors('Record offset out of boundary!');
     }
 
@@ -257,16 +276,19 @@ RecordManager.getRecord = function (table, id, record) {
         throw new DBError('Record offset out of boundary!');
     }
     bm.unpinPage(table.bp, page);
+    return record;
 };
 
 
-//Scan
-RecordManager.startScan = function (table, scan, cond) {
-};
-RecordManager.next = function (scan, record) {
-};
-RecordManager.closeScan = function (scan) {
-};
+//Scan function is implemented in the Scan object
+// RecordManager.startScan = function (table, scan, cond) {
+//     "use strict";
+//
+// };
+// RecordManager.next = function (scan, record) {
+// };
+// RecordManager.closeScan = function (scan) {
+// };
 
 //dealing with schema
 
@@ -310,7 +332,9 @@ RecordManager.freeSchema = function (schema) {
 function getSchemaFromFile(tableName) {
     "use strict";
     var json = JSON.parse(sm.readJSON(Constants.workdir + Constants.schemasdir + tableName));
-    return (new Schema).upateFromJSON(json);
+    var schema = new Schema();
+    schema.upateFromJSON(json);
+    return schema;
 }
 
 //dealing with records and attribute values
@@ -405,18 +429,18 @@ function writeRecord(buf, schema, record) {
                     throw new DBError('Insert data is out of boundary!')
                 }
                 //buf.write(record.data[i].toString(), curs, length, Constants.CODING);
-                switch(schema.dataTypes[i]){
+                switch (schema.dataTypes[i]) {
                     case Schema.Datatype.DT_INT:
-                        writeInt(buf.slice(curs,curs+length),record.data[i], length);
+                        writeInt(buf.slice(curs, curs + length), record.data[i], length);
                         break;
                     case Schema.Datatype.DT_BOOL:
-                        writeBoolean(buf.slice(curs,curs+length),record.data[i]);
+                        writeBoolean(buf.slice(curs, curs + length), record.data[i]);
                         break;
                     case Schema.Datatype.DT_STRING:
-                        writeString(buf.slice(curs,curs+length),record.data[i]);
+                        writeString(buf.slice(curs, curs + length), record.data[i]);
                         break;
                     case Schema.Datatype.DT_FLOAT:
-                        writeFloat(buf.slice(curs,curs+length),record.data[i]);
+                        writeFloat(buf.slice(curs, curs + length), record.data[i]);
                         break;
 
                 }
@@ -432,12 +456,12 @@ function writeString(buf, data) {
     buf.write(data, Constants.CODING);
 }
 
-function writeInt(buf, data, length)  {
+function writeInt(buf, data, length) {
     "use strict";
     return buf.writeIntBE(data, 0, length);
 }
 
-function writeFloat(buf, data)  {
+function writeFloat(buf, data) {
     "use strict";
     return buf.writeFloatBE(data, 0);
 }
@@ -445,7 +469,7 @@ function writeFloat(buf, data)  {
 function writeBoolean(buf, data) {
     "use strict";
     var val;
-    if (data == true) val =  1;
+    if (data == true) val = 1;
     else val = 0;
     buf.writeInt8(data);
 }
@@ -472,16 +496,16 @@ function readRecord(buf, schema, record) {
             var length = schema.typeLength[i];
             switch (schema.dataTypes[i]) {
                 case Schema.Datatype.DT_INT:
-                    record.data[i] = readInt(length, buf.slice(curs, curs+length), record.data[i]);
+                    record.data[i] = readInt(length, buf.slice(curs, curs + length), record.data[i]);
                     break;
                 case Schema.Datatype.DT_BOOL:
-                    record.data[i] = readBoolean(length, buf.slice(curs, curs+length), record.data[i]);
+                    record.data[i] = readBoolean(length, buf.slice(curs, curs + length), record.data[i]);
                     break;
                 case Schema.Datatype.DT_STRING:
-                    record.data[i] = readString(length, buf.slice(curs, curs+length));
+                    record.data[i] = readString(length, buf.slice(curs, curs + length));
                     break;
                 case Schema.Datatype.DT_FLOAT:
-                    record.data[i] = readFloat(length, buf.slice(curs, curs+length), record.data[i])
+                    record.data[i] = readFloat(length, buf.slice(curs, curs + length), record.data[i])
                     break;
 
             }
@@ -493,16 +517,16 @@ function readRecord(buf, schema, record) {
 function readString(length, buf) {
     "use strict";
     var j;
-    for ( j = 0; j < length; j++) {
+    for (j = 0; j < length; j++) {
         if (buf[j] == 0)
             break;
     }
-   return buf.toString(Constants.CODING,0,j);
+    return buf.toString(Constants.CODING, 0, j);
 }
 
 function readInt(length, buf) {
     "use strict";
-    return  buf.readIntBE(0, length);
+    return buf.readIntBE(0, length);
 }
 
 function readFloat(length, buf) {
@@ -527,6 +551,121 @@ function resetRecord(buf) {
 
     buf.writeInt8(1, 8);//is null
 }
+
+
+CatalogManager.init = function () {
+    "use strict";
+    catalog = new Catalog();
+    CatalogManager.scanAllTheRecords(catalog);
+}
+
+CatalogManager.scanAllTheRecords = function (catalog) {
+    var scan = new Scan(catalog);
+    scan.startScan();
+    var data = scan.next();
+    while (data != null) {
+        catalog.add(data.tableName, data.numberOfTuple);
+        data = scan.next();
+    }
+}
+
+CatalogManager.shutdown = function () {
+    "use strict";
+    catalog.shutdown();
+}
+
+
+CatalogManager.add = function (tableName, numOfTuples) {
+    "use strict";
+    if (CatalogManager.find(tableName) == null) {
+        var data = catalog.add(tableName, numOfTuples);
+        //catalog.updateLastRID(data.RID);
+        RecordManager.insertRecord(catalog, catalog.getRecord(data));
+    }
+}
+
+CatalogManager.remove = function (tableName) {
+    "use strict";
+    var data = catalog.remove(tableName);
+    RecordManager.deleteRecord(catalog, data.RID);
+}
+
+CatalogManager.find = function (tableName) {
+    "use strict";
+    var node = catalog.search(tableName);
+    if (node) {
+        var record = new Record();
+        RecordManager.getRecord(catalog, node.data.RID, record);
+        return record;
+    } else
+        return null;
+}
+/**
+ *
+ * @param tableName
+ * @param {Catalog.tableInfo}data
+ * @returns {*}
+ */
+CatalogManager.update = function (data) {
+    "use strict";
+    var record = this.find(data.tableName);
+    data.RID = record.id;
+    catalog.update(data.tableName, data);
+    RecordManager.updateRecord(catalog, catalog.getRecord(data))
+}
+
+function Scan(table) {
+    "use strict";
+    this.table = table;
+    this.cond;
+    this.curse;//RID
+    this.maxSlot = table.schema.getSize();
+}
+
+RecordManager.Scan = Scan;
+
+Scan.prototype.startScan = function (cond) {
+    "use strict";
+    if (cond) this.cond = cond;
+    this.curse = new Record.RID(0, 1);
+};
+
+Scan.prototype.next = function () {
+    "use strict";
+    while (this.curse.compareTo(this.table.lastRID) <= 0) {
+        //read the record
+        var record = RecordManager.getRecord(this.table, this.curse, new Record());
+        if (record.isNull == 0 && satisfyTheCond(record, this.cond))// the record is not null and satisfied the condition
+        {
+            nextCurse(this.curse, this.maxSlot);
+            return this.table.getData(record);
+        }
+        nextCurse(this.curse, this.maxSlot);
+    }
+
+    return null;
+};
+
+function satisfyTheCond(record, cond) {
+    return true;
+};
+
+function nextCurse(curse, maxSlot) {
+    "use strict";
+    if (curse.slot == maxSlot) {
+        curse.page++;
+        curse.slot = 0;
+    } else {
+        curse.slot++;
+    }
+}
+
+Scan.prototype.closeScan = function () {
+    "use strict";
+    this.curse = new Record.RID(0, 1);
+
+};
+
 
 module.exports = RecordManager;
 

@@ -28,10 +28,20 @@ Record.RID.prototype.getSlotIndex = function () {
     return this.slot * Constants.slotSize;
 }
 
-Record.prototype.toString = function () {
-    return JSON.stringify(this.id) + ', ' + JSON.stringify(this.isNull) + ', ' + JSON.stringify(this.data);
+Record.RID.prototype.compareTo = function (rid) {
+    "use strict";
+    if(this.page < rid.page)
+        return -1;
+    else if(this.page == rid.page)
+        if(this.slot == rid.slot)
+            return 0;
+        else if(this.slot < rid.slot)
+            return -1;
+        else
+            return 1;
+    else
+        return 1;
 }
-
 // /**
 //  * if shcema is not defined , return the previous size
 //  * @param {Schema}schema

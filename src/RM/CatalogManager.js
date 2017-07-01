@@ -4,13 +4,29 @@
 var Catalog = require('./Catalog');
 var Record = require('./Record');
 var rm = require('./RecordManager');
+var bm = require('../BM/BufferManager');
+var sleep =require('sleep');
+var Scan = require('./Scan');
 var CatalogManager ={};
+
+var Page = require('../BM/Page');
 
 var catalog;
 
+CatalogManager.catalog = catalog;
 CatalogManager.init = function(){
     "use strict";
     catalog = new Catalog();
+}
+
+CatalogManager.scanAllTheRecords = function(){
+    var scan  = new Scan(catalog);
+    scan.startScan();
+    var re = scan.next();
+    while(re != null){
+        console.log(JSON.stringify(re));
+        re = scan.next();
+    }
 }
 
 CatalogManager.shutdown = function(){

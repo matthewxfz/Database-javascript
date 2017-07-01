@@ -168,6 +168,20 @@ StorageManaer.readBlock = function (pageNum, file, memPage, callback) {
     }
 }
 
+StorageManaer.readBlockSync = function (path, buf, pageNum) {
+    var fd;
+    try{
+         fd = fs.openSync(path,'r');
+    }catch(err){
+        if(err.code == 'ENOENT')
+        {
+            fd = fs.openSync(path,'w+');
+        }else{
+            if(err) throw err;
+        }
+    }
+    fs.readSync(fd, buf.slice(0,Constants.PAGE_SIZE),0, Constants.PAGE_SIZE, pageNum);
+}
 
 
 
@@ -388,10 +402,9 @@ StorageManaer.writeJSONSync = function (filename, buf, callback) {
  * @param {any} callback
  */
 StorageManaer.readJSON = function (filename, callback) {
-    fs.access(filename,fs.constants.R_OK, (err)=>{
-        if(err) throw err;
-    });
-    return fs.readFileSync(filename,Constants.CODING);
+    fs.accessSync(filename, fs.constants.R_OK);
+    var result = fs.readFileSync(filename,Constants.CODING);
+    return result;
 }
 
 

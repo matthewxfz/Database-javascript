@@ -14,7 +14,7 @@ function TablePool(){
     this.tables = new Queue();
 }
 
-TablePool.size = function(){
+TablePool.prototype.size = function(){
     "use strict";
     if(this.tables){
         return 0;
@@ -23,28 +23,28 @@ TablePool.size = function(){
     }
 }
 
-TablePool.add = function(table){
+TablePool.prototype.add = function(table){
     "use strict";
     this.tables.push(table);
 }
 
-TablePool.remove =  function(table){
+TablePool.prototype.remove =  function(table){
     "use strict";
-    var ite = table.iterator();
+    var ite = this.tables.iterator();
     while(ite.hasNext()){
         var ta = ite.next();
-        if(ta.compareTo(table))
-            this.tables.remove(table);
+        if(ta.data.compareTo(table))
+            this.tables.remove(ta);
     }
 }
 
-TablePool.search = function(tableName){
+TablePool.prototype.search = function(tableName){
     "use strict";
-    var ite = table.iterator();
+    var ite = this.tables.iterator();
     while(ite.hasNext()){
         var ta = ite.next();
-        if(ta.data.name == tableName)
-            return ta;
+        if(ta.data.name  == tableName)
+            return ta.data;
     }
     return null;
 }
