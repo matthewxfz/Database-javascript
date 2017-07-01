@@ -1,13 +1,21 @@
 'use strict'
 var sm = require('./SM/StorageManager'),
-    rm =require('./RM/RecordManager'),
+    rm = require('./RM/RecordManager'),
     fs = require('fs'),
     File = require('./BM/File'),
     util = require('./util/util'),
     assert = require('assert'),
-    Queue = require('./BM/BMQueue'),
+    BMQueue = require('./BM/BMQueue'),
+    Queue = require('./util/Queue'),
     TestHelper = require('../test/TestHelper'),
-    Constants = require('./Constants');
+    Constants = require('./Constants'),
+    CatalogM = require('./RM/CatalogManager'),
+    Catalog = require('./RM/Catalog'),
+    Schema = require('./RM/Schema'),
+    Record = require('./RM/Record'),
+    sleep = require('sleep'),
+    Page = require('./BM/Page'),
+    Iterator = require('./util/Iterator');
 
 var ts = require('../test/TestHelper');
 
@@ -31,11 +39,123 @@ function BM_BufferPool(pageFile, numPages, strategy, mgmtData) {
     this.strategy = strategy;
     this.mgmtData = mgmtData;
 }
+testTableWholeFunction();
+
+function testTableWholeFunction() {
+
+    rm.initRecordManager();
+    rm.createTable('student',
+        rm.createSchema(4, ['name', 'school', 'age', 'isFool'],
+            [Schema.Datatype.DT_STRING, Schema.Datatype.DT_STRING, Schema.Datatype.DT_INT, Schema.Datatype.DT_BOOL],
+            [8, 8, 4, 4],
+            1,
+            [1, 0, 0, 0],
+            'student'));
+    rm.createTable('department',
+        rm.createSchema(4, ['did', 'name', 'salary', 'isBig'],
+            [Schema.Datatype.DT_INT, Schema.Datatype.DT_STRING, Schema.Datatype.DT_INT, Schema.Datatype.DT_BOOL],
+            [8, 8, 4, 4],
+            1,
+            [1, 0, 0, 0],
+            'department'));
+    rm.createTable('school',
+        rm.createSchema(4, ['sid', 'name', 'studnet', 'isClosed'],
+            [Schema.Datatype.DT_INT, Schema.Datatype.DT_STRING, Schema.Datatype.DT_INT, Schema.Datatype.DT_BOOL],
+            [8, 8, 4, 4],
+            1,
+            [1, 0, 0, 0],
+            'school'));
+
+    rm.openTable('student');
+    var students = rm.getTableByName('student');
+    rm.insertRecord(students,new Record('',0,['Xiong','iit',10,1]));
+    rm.insertRecord(students,new Record('',0,['Yan','iit',10,1]));
+    rm.insertRecord(students,new Record('',0,['Lee','iit',10,1]));
+    rm.insertRecord(students,new Record('',0,['Sync','iit',10,1]));
+    rm.insertRecord(students,new Record('',0,['Liang','iit',10,1]));
+
+    rm.closeTable(students);
+
+    rm.shutdownRecordManager();
 
 
-buf.writeInt16BE(17,0);
-console.log(buf);
+}
+function testCatalog(){
+    CatalogM.init();
 
+    CatalogM.add('teacher');
+    CatalogM.add('student');
+    CatalogM.add('registerTo');
+    CatalogM.add('class');
+    CatalogM.add('department');
+    CatalogM.add('badfdslfjaksldfjlasdjflksaj');
+    //CatalogM.add('hellow rold');
+    //CatalogM.remove('student');
+    //var tablinfo = new Catalog.TableInfo(new Record.RID(0,10),'class', 12);
+    //CatalogM.update(tablinfo);
+    //var record = CatalogM.find('teacher');
+    //console.log(JSON.stringify(record));
+    CatalogM.scanAllTheRecords();
+    CatalogM.shutdown();
+}
+
+
+function testTablesWithCatalogInBP() {
+    var schema = new Schema(4, ['attriName', 'dataType', 'typeLength', 'isKey'],
+        [Schema.Datatype.DT_STRING, Schema.Datatype.DT_INT, Schema.Datatype.DT_INT, Schema.Datatype.DT_BOOL],
+        [64, 1, 4, 1],
+        [0, 0, 0, 0],
+        0);
+    var bp = getCatalogBp();
+    var catalog = new Catalog();
+
+
+    var buf = Buffer.alloc(Constants.PAGE_SIZE);
+// buf.writeInt32BE(4017,0);
+// sm.safeWriteBlock(bp.pageFile,buf,0,0);
+//init
+    bm.initBufferPool(bp, bp.pageFile, 1, bp.strategy);
+
+
+// rm.insertRecord(catalog, new Record('', '',['hello',0, 12, 1]));
+// rm.insertRecord(catalog, new Record('', '',['world',0, 12, 1]));
+// rm.insertRecord(catalog, new Record('', '',['myfriend',0, 12, 1]));
+//
+// var record = new Record();
+//
+// rm.getRecord(catalog, new Record.RID(0,1),record);
+// console.log(JSON.stringify(record));
+// rm.getRecord(catalog, new Record.RID(0,2),record);
+// console.log(JSON.stringify(record));
+// rm.getRecord(catalog, new Record.RID(0,3),record);
+// console.log(JSON.stringify(record));
+
+
+    bm.shutdownBufferPool(bp);
+}
+
+
+function getCatalogBp() {
+    "use strict";
+    var bp = new BM_BufferPool(Catalog.getCatalogAccess(), Constants.catalogBPLength, Constants.catalogStra);
+
+    try {
+        fs.accessSync(getDictionaryAccess(), fs.constants.R_OK | fs.constants.W_OK);
+    } catch (err) {
+        if (err.code === 'ENOENT') {// build the empty file
+            var buf = Buffer.alloc(sm.PAGE_SIZE)
+            sm.safeWriteBlock(getDictionaryAccess(), buf, 0, 0);
+        }
+    }
+
+    //read the record
+
+    //var totalpages = sm.getPageNumofFile(getDictionaryAccess());
+
+    bm.initBufferPool(bp, bp.pageFile, 1, bp.strategy);
+
+    return bp;
+}
 function testCreateSchema() {
     var path = '/Users/matthewxfz/Workspaces/gits/Database-javascript/dictionary';
     var buf = Buffer.alloc(sm.PAGE_SIZE);
@@ -48,7 +168,7 @@ function testCreateSchema() {
     console.log(buf.readInt32BE(0, 4));
     sm.safeWriteBlock(path, buf, 0, 0, () => {
         sm.safeReadBlock(path, buf2, 0, 0, () => {
-            console.log(buf2.readInt32BE(0,4));
+            console.log(buf2.readInt32BE(0, 4));
         })
     });
 }
@@ -284,7 +404,7 @@ function safeWriteBlock(file, buf, offset, callback) {
 
 function testQueue() {
     var fixcount = [0, 0, 1, 0];
-    var queue = new Queue(4, fixcount);
+    var queue = new BMQueue(4, fixcount);
     queue.push(2);
     queue.push(0);
     queue.push(3);

@@ -32,6 +32,7 @@ var workdir = Constants.workdir;
 var tablePool;
 var catalog;
 var CatalogManager = {};
+RecordManager.CatalogManager = CatalogManager;
 
 /**
  * Check env

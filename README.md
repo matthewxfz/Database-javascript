@@ -8,6 +8,9 @@ from a file on disk into memory and writing blocks from memory to a file on disk
 Part 2- Buffer Manager
 The goal of this assignment is to implement a buffer manager which manages a fixed number of pages in memory that represent pages from a page file managed by the storage manager.The Buffer manager should be able to handle more than one open buffer pool at the same time or one open buffer pool for each page file. FIFO and LRU replacement strategy implementations are required.
 
+Part 2- Record Manager
+
+
 
 #Members:
 1. Fangzhou Xiong	A20376382    <fxiong4@hawk.iit.edu> 33.33%

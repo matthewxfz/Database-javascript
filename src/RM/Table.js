@@ -126,7 +126,7 @@ RM_TableData.prototype.decreaseTuple = function () {
 
 RM_TableData.prototype.getData = function (record) {
     "use strict";
-    return JSON.parse(record);
+    return record.data;
 }
 
 
