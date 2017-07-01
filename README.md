@@ -8,9 +8,8 @@ from a file on disk into memory and writing blocks from memory to a file on disk
 Part 2- Buffer Manager
 The goal of this assignment is to implement a buffer manager which manages a fixed number of pages in memory that represent pages from a page file managed by the storage manager.The Buffer manager should be able to handle more than one open buffer pool at the same time or one open buffer pool for each page file. FIFO and LRU replacement strategy implementations are required.
 
-Part 2- Record Manager
-
-
+Part 3- Record Manager
+The goal of this assignment is to implement a record manager which could handle tables with a fixed schema. The implementations of insertion, deletion, update and scan operation are required. 
 
 #Members:
 1. Fangzhou Xiong	A20376382    <fxiong4@hawk.iit.edu> 33.33%
@@ -22,22 +21,20 @@ Part 2- Record Manager
 1. unpack the zip file to local
 2. direct to the <rootworkpath>
 3. run command: npm install mocha -g
-4. To run the test case, run command: mocha
+4. To run the test case, run command: mocha <file path>
+    I.E
+    direct into the root dir of the project
+    you should run : mocha ./test/test_assign3_1.js 
 
 #dependency
 ./package.json
 
 #layout
 ./src/DBErrors.js         command defined DBErrors
-./src/File.js             file handle object
-./src/StorageManager.js   storage manager 
-./src/BufferManger.js     Buffer manager
-./src/BMQueue.js            queue for buffer manger FIFO and LRU
-./src/BufferManagerHelper page handle
-./src/BM_BufferPool       buffer pool handle
-./test/test_assign1_1.js  test cases for storage manager
-./test/test_assign2_1.js  test cases for buffer manger
-./test/TestHelper         test helper
+./src/Constants.js        Constants variable class
+./src/BM                  Buffer manager
+./src/RM                  Record Manager
+./src/SM                  Storage Manger
 
 
 #API
@@ -99,3 +96,49 @@ Part 2- Record Manager
 12. FIFO: FIFO replacement strategy
 
 13. LRU: LRU replacement strategy
+
+--RecordManager
+1.  initRecordManager:      Initialize the Record Manager with a given entry to the buffer manager
+
+2.  shutdownRecordManager:  Shut down the Record Manager
+
+3.  initTableInfoPage:      Initialize table info page
+
+4.  createTable:            Create table file with given name and schema
+
+5.  openTable:              Open table
+
+6.  closeTable:             Close table
+
+7.  deleteTable:            Delete table
+
+8.  getNumTuples:           Get total number of tuples in table
+
+9.  insertRecord:           Insert records into table
+
+10. deleteRecord:           Delete records from table
+
+11. updateRecord:           Update records
+
+12. getRecord:              Return Records
+
+13. startScan:              Scan all the tuple in table with given condition
+
+14. next:                   Give an next eligble record in table
+
+15. closeScan:              Clost scan
+
+16. getRecordSize:          Get size of each record
+
+17. createSchema:           Create schema with given value
+
+18. freeSchema:             Unset schema
+
+19. createRecord:           Create empty record with given schema
+
+20. freeRecord:             Unset record
+
+21. getAttr:                Get the value of requested attribute
+
+22. setAttr:                Update the value of requested attribute
+
