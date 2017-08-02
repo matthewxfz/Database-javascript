@@ -12,9 +12,9 @@ Part 3- Record Manager
 The goal of this assignment is to implement a record manager which could handle tables with a fixed schema. The implementations of insertion, deletion, update and scan operation are required. 
 
 #Members:
-1. Fangzhou Xiong	A20376382    <fxiong4@hawk.iit.edu> 33.33%
-2. Zhiquan  Li		A20381063	 <zli175@hawk.iit.edu>  33.33%
-3. Guangda  Li		A20360157    <gli32@hawk.iit.edu>   33.33%
+1. Fangzhou Xiong	A20376382    <fxiong4@hawk.iit.edu> 
+2. Zhiquan  Li		A20381063	 <zli175@hawk.iit.edu>  
+3. Guangda  Li		A20360157    <gli32@hawk.iit.edu>   
 
 
 #Instruction of running program:
